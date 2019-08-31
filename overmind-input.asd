@@ -2,7 +2,10 @@
   :version "0.1.0"
   :author ""
   :license ""
-  :depends-on ()
+  :depends-on (:cl21
+	       :lparallel
+	       :cl-json
+	       :dexador)
   :components ((:module "src"
                 :components
                 ((:file "main"))))
