@@ -19,6 +19,7 @@
            :get-trades
 	   :get-transactions
            :get-rates
+	   :get-rates-range
            :load-data))
 (in-package :overmind-input)
 
@@ -132,7 +133,22 @@ alignmentTimezone=America%2FNew_York"
            nil
            0)))
 
-;; (local-time:timestamp- (local-time:now) 1 :month)
+(defun get-rates-range (instrument timeframe from to)
+  "Gathers prices from Oanda."
+  (let ((from (* (local-time:timestamp-to-unix from) 1000000))
+	(to (* (local-time:timestamp-to-unix to) 1000000)))
+    (rest (assoc :candles
+		 (cl-json:decode-json-from-string
+		  (dex:get #"https://api-fxtrade.oanda.com/v1/candles?\
+instrument=${instrument}&\
+granularity=${timeframe}&\
+start=${from}&\
+end=${to}&\
+dailyAlignment=0&\
+candleFormat=bidask&\
+alignmentTimezone=America%2FNew_York"
+			   :insecure t
+			   :headers '(("X-Accept-Datetime-Format" . "UNIX"))))))))
 
 (defun get-transactions ()
   (let* ((headers `(("Authorization" . ,#"Bearer ${*token*}")
