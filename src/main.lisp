@@ -135,8 +135,8 @@ alignmentTimezone=America%2FNew_York"
 
 (defun get-rates-range (instrument timeframe from to)
   "Gathers prices from Oanda."
-  (let ((from (* (local-time:timestamp-to-unix from) 1000000))
-	(to (* (local-time:timestamp-to-unix to) 1000000)))
+  (let ((from (* from 1000000))
+	(to (* to 1000000)))
     (rest (assoc :candles
 		 (cl-json:decode-json-from-string
 		  (dex:get #"https://api-fxtrade.oanda.com/v1/candles?\
