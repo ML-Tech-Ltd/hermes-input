@@ -107,7 +107,7 @@ A batch = 5,000 rates."
                                                      (dex:get #"https://api-fxtrade.oanda.com/v1/candles?\
 instrument=${instrument}&\
 granularity=${granularity}&\
-count=500&\
+count=5000&\
 end=${end}&\
 dailyAlignment=0&\
 candleFormat=bidask&\
