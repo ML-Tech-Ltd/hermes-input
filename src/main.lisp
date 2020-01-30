@@ -16,6 +16,7 @@
 	:lparallel)
   (:export :*bests*
            :*instruments*
+	   :*timeframes*
            :get-results
            :get-trades
 	   :get-transactions
@@ -39,6 +40,9 @@
                               #H(:pair :GBP_USD :granularity :H1 :jpy? nil)
                               #H(:pair :USD_CAD :granularity :H1 :jpy? nil)
                               #H(:pair :USD_JPY :granularity :H1 :jpy? t)))
+
+(defparameter *timeframes*
+  '(:H1 :D))
 
 (defparameter *instruments*
   '(:AUD_CAD :AUD_CHF :AUD_HKD :AUD_JPY :AUD_NZD :AUD_SGD :AUD_USD :CAD_CHF :CAD_HKD :CAD_JPY :CAD_SGD :CHF_HKD :CHF_JPY :CHF_ZAR
