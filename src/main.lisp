@@ -15,6 +15,11 @@
   (:use :cl21
 	:lparallel)
   (:export :*bests*
+	   :*forex*
+	   :*indices*
+	   :*commodities*
+	   :*bonds*
+	   :*metals*
            :*instruments*
 	   :*timeframes*
            :get-results
@@ -44,27 +49,27 @@
 (defparameter *timeframes*
   '(:H1 :D))
 
-(defparameter *instruments*
-  '(:AUD_CAD :AUD_CHF :AUD_HKD :AUD_JPY :AUD_NZD :AUD_SGD :AUD_USD :CAD_CHF :CAD_HKD :CAD_JPY :CAD_SGD :CHF_HKD :CHF_JPY :CHF_ZAR
-    :EUR_AUD :EUR_CAD :EUR_CHF :EUR_CZK :EUR_DKK :EUR_GBP :EUR_HKD :EUR_HUF :EUR_JPY :EUR_NOK :EUR_NZD :EUR_PLN :EUR_SEK :EUR_SGD
-    :EUR_TRY :EUR_USD :EUR_ZAR :GBP_AUD :GBP_CAD :GBP_CHF :GBP_HKD :GBP_JPY :GBP_NZD :GBP_PLN :GBP_SGD :GBP_USD :GBP_ZAR :HKD_JPY
-    :NZD_CAD :NZD_CHF :NZD_HKD :NZD_JPY :NZD_SGD :NZD_USD :SGD_CHF :SGD_HKD :SGD_JPY :TRY_JPY :USD_CAD :USD_CHF :USD_CNH :USD_CZK
-    :USD_DKK :USD_HKD :USD_HUF :USD_INR :USD_JPY :USD_MXN :USD_NOK :USD_PLN :USD_SAR :USD_SEK :USD_SGD :USD_THB :USD_TRY :USD_ZAR
-    :ZAR_JPY
-    
-    ;; indices
-    :AU200_AUD :CN50_USD :EU50_EUR :FR40_EUR :DE30_EUR :HK33_HKD :IN50_USD :JP225_USD :NL25_EUR :SG30_SGD :TWIX_USD :UK100_GBP
-    :NAS100_USD :US2000_USD :SPX500_USD :US30_USD
-    
-    ;; commodities
-    :BCO_USD :XCU_USD :CORN_USD :NATGAS_USD :SOYBN_USD :SUGAR_USD :WTICO_USD :WHEAT_USD
-    
-    ;; bonds
-    :DE10YB_EUR :UK10YB_GBP :USB10Y_USD :USB02Y_USD :USB05Y_USD :USB30Y_USD
-    
-    ;; metals
-    :XAU_USD :XAU_XAG :XPD_USD :XPT_USD :XAG_USD
-    ))
+(defparameter *forex* '(:AUD_USD :EUR_GBP :EUR_JPY :EUR_USD :GBP_USD :USD_CAD :USD_CHF :USD_JPY))
+(defparameter *indices* '(:AU200_AUD :CN50_USD :EU50_EUR
+			  :FR40_EUR
+			  :DE30_EUR
+			  :HK33_HKD
+			  :IN50_USD :JP225_USD :NL25_EUR :SG30_SGD :TWIX_USD :UK100_GBP
+			  :NAS100_USD :US2000_USD :SPX500_USD :US30_USD))
+(defparameter *commodities* '(:BCO_USD :XCU_USD :CORN_USD :NATGAS_USD :SOYBN_USD :SUGAR_USD :WTICO_USD :WHEAT_USD))
+(defparameter *bonds* '(:DE10YB_EUR :UK10YB_GBP :USB10Y_USD :USB02Y_USD :USB05Y_USD :USB30Y_USD))
+(defparameter *metals* '(:XAU_USD :XAU_XAG :XPD_USD :XPT_USD :XAG_USD))
+
+(defparameter *instruments* (append *forex* *indices* *commodities* *bonds* *metals*))
+
+;; (defparameter *instruments*
+;;   '(;; :AUD_CAD :AUD_CHF :AUD_HKD :AUD_JPY :AUD_NZD :AUD_SGD :AUD_USD :CAD_CHF :CAD_HKD :CAD_JPY :CAD_SGD :CHF_HKD :CHF_JPY :CHF_ZAR
+;;     ;; :EUR_AUD :EUR_CAD :EUR_CHF :EUR_CZK :EUR_DKK :EUR_GBP :EUR_HKD :EUR_HUF :EUR_JPY :EUR_NOK :EUR_NZD :EUR_PLN :EUR_SEK :EUR_SGD
+;;     ;; :EUR_TRY :EUR_USD :EUR_ZAR :GBP_AUD :GBP_CAD :GBP_CHF :GBP_HKD :GBP_JPY :GBP_NZD :GBP_PLN :GBP_SGD :GBP_USD :GBP_ZAR :HKD_JPY
+;;     ;; :NZD_CAD :NZD_CHF :NZD_HKD :NZD_JPY :NZD_SGD :NZD_USD :SGD_CHF :SGD_HKD :SGD_JPY :TRY_JPY :USD_CAD :USD_CHF :USD_CNH :USD_CZK
+;;     ;; :USD_DKK :USD_HKD :USD_HUF :USD_INR :USD_JPY :USD_MXN :USD_NOK :USD_PLN :USD_SAR :USD_SEK :USD_SGD :USD_THB :USD_TRY :USD_ZAR
+;;     ;; :ZAR_JPY
+;;     ))
 
 (defparameter *bests*
   #H(:AUD_USD #H(:M15 '(9 22 T 3.9726815)
