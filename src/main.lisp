@@ -21,6 +21,8 @@
 	   :*bonds*
 	   :*metals*
            :*instruments*
+	   :*shortterm*
+	   :*longterm*
 	   :*timeframes*
            :get-results
            :get-trades
@@ -46,9 +48,6 @@
                               #H(:pair :USD_CAD :granularity :H1 :jpy? nil)
                               #H(:pair :USD_JPY :granularity :H1 :jpy? t)))
 
-(defparameter *timeframes*
-  '(:H1 :D))
-
 (defparameter *forex* '(:AUD_USD :EUR_GBP :EUR_JPY :EUR_USD :GBP_USD :USD_CAD :USD_CHF :USD_JPY))
 (defparameter *indices* '(:AU200_AUD :CN50_USD :EU50_EUR
 			  :FR40_EUR
@@ -59,8 +58,11 @@
 (defparameter *commodities* '(:BCO_USD :XCU_USD :CORN_USD :NATGAS_USD :SOYBN_USD :SUGAR_USD :WTICO_USD :WHEAT_USD))
 (defparameter *bonds* '(:DE10YB_EUR :UK10YB_GBP :USB10Y_USD :USB02Y_USD :USB05Y_USD :USB30Y_USD))
 (defparameter *metals* '(:XAU_USD :XAU_XAG :XPD_USD :XPT_USD :XAG_USD))
-
 (defparameter *instruments* (append *forex* *indices* *commodities* *bonds* *metals*))
+
+(defparameter *shortterm* '(:H1))
+(defparameter *longterm* '(:D))
+(defparameter *timeframes* (append *shortterm* *longterm*))
 
 ;; (defparameter *instruments*
 ;;   '(;; :AUD_CAD :AUD_CHF :AUD_HKD :AUD_JPY :AUD_NZD :AUD_SGD :AUD_USD :CAD_CHF :CAD_HKD :CAD_JPY :CAD_SGD :CHF_HKD :CHF_JPY :CHF_ZAR
