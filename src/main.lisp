@@ -29,6 +29,7 @@
 	   :get-transactions
            :get-rates
 	   :get-rates-range
+	   :get-rates-count
            :load-data)
   (:nicknames :ominp))
 (in-package :overmind-input)
@@ -184,6 +185,20 @@ candleFormat=bidask&\
 alignmentTimezone=America%2FNew_York"
 			   :insecure t
 			   :headers '(("X-Accept-Datetime-Format" . "UNIX"))))))))
+
+(defun get-rates-count (instrument timeframe count)
+  "Gathers `COUNT` prices from Oanda."
+  (rest (assoc :candles
+	       (cl-json:decode-json-from-string
+		(dex:get #"https://api-fxtrade.oanda.com/v1/candles?\
+instrument=${instrument}&\
+granularity=${timeframe}&\
+count=${count}&\
+dailyAlignment=0&\
+candleFormat=bidask&\
+alignmentTimezone=America%2FNew_York"
+			 :insecure t
+			 :headers '(("X-Accept-Datetime-Format" . "UNIX")))))))
 
 (defun get-transactions ()
   (let* ((headers `(("Authorization" . ,#"Bearer ${*token*}")
