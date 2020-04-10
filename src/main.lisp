@@ -30,6 +30,7 @@
            :get-rates
 	   :get-rates-range
 	   :get-rates-count
+	   :get-random-rates-count
            :load-data)
   (:nicknames :ominp))
 (in-package :overmind-input)
@@ -49,7 +50,7 @@
                               #H(:pair :USD_CAD :granularity :H1 :jpy? nil)
                               #H(:pair :USD_JPY :granularity :H1 :jpy? t)))
 
-(defparameter *forex* '(:AUD_USD :EUR_GBP :EUR_JPY :EUR_USD :GBP_USD :USD_CAD :USD_CHF :USD_JPY))
+(defparameter *forex* '(:AUD_USD :EUR_GBP :EUR_JPY :EUR_USD :GBP_USD :USD_CAD :USD_CHF :USD_CNH :USD_HKD :USD_JPY))
 (defparameter *indices* '(:AU200_AUD :CN50_USD :EU50_EUR
 			  :FR40_EUR
 			  :DE30_EUR
@@ -186,6 +187,10 @@ alignmentTimezone=America%2FNew_York"
 			   :insecure t
 			   :headers '(("X-Accept-Datetime-Format" . "UNIX"))))))))
 
+(defun timeframe-for-local-time (timeframe)
+  (cond ((eq timeframe :H1) :HOUR)
+        ((eq timeframe :D) :DAY)))
+
 (defun get-rates-count (instrument timeframe count)
   "Gathers `COUNT` prices from Oanda."
   (rest (assoc :candles
@@ -200,6 +205,27 @@ alignmentTimezone=America%2FNew_York"
 			 :insecure t
 			 :headers '(("X-Accept-Datetime-Format" . "UNIX")))))))
 
+(defun get-random-rates-count (instrument timeframe count)
+  "Gathers prices from Oanda."
+  (let ((from (* 1000000
+		 (local-time:timestamp-to-unix
+		  (local-time:timestamp- (local-time:now)
+					 (floor (+ count (* (- 5000 count) (alexandria:gaussian-random 0 1))))
+					 (timeframe-for-local-time timeframe))))))
+    (rest (assoc :candles
+	       (cl-json:decode-json-from-string
+		(dex:get #"https://api-fxtrade.oanda.com/v1/candles?\
+instrument=${instrument}&\
+granularity=${timeframe}&\
+start=${from}&\
+count=${count}&\
+dailyAlignment=0&\
+candleFormat=bidask&\
+alignmentTimezone=America%2FNew_York"
+			 :insecure t
+			 :headers '(("X-Accept-Datetime-Format" . "UNIX"))))))))
+
+;; 
 (defun get-transactions ()
   (let* ((headers `(("Authorization" . ,#"Bearer ${*token*}")
 		    ;; ("X-Accept-Datetime-Format" . "UNIX")
