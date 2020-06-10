@@ -1,0 +1,9 @@
+(defpackage overmind-input.config
+  (:use :cl)
+  (:export :*tiingo-token*
+	   :*oanda-token*
+	   :*oanda-account*))
+
+(defparameter *tiingo-token* "")
+(defparameter *oanda-token* "")
+(defparameter *oanda-account* "")

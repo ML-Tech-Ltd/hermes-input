@@ -3,12 +3,18 @@
   :author ""
   :license ""
   :depends-on (:cl21
+	       :access
 	       :lparallel
+	       :cl-ppcre
 	       :cl-json
-	       :dexador)
+	       :cl-dates
+	       :flexi-streams
+	       :dexador
+	       :drakma)
   :components ((:module "src"
                 :components
-                ((:file "main"))))
+                ((:file "main" :depends-on ("config"))
+		 (:file "config"))))
   :description ""
   :long-description
   #.(read-file-string
