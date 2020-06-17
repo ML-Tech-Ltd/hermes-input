@@ -220,7 +220,7 @@ alignmentTimezone=America%2FNew_York"
 
 (defun get-rates-count (instrument timeframe count &key (provider :tiingo) (type :fx))
   "Requests `COUNT` rates from `PROVIDER`."
-  (cond ((eq provider :oanda) (oanda-rates-count instrument count))
+  (cond ((eq provider :oanda) (oanda-rates-count instrument timeframe count))
 	;; Tiingo is default provider.
 	(t (tiingo-rates-count instrument timeframe count :type type))))
 
