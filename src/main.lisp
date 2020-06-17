@@ -193,7 +193,6 @@ alignmentTimezone=America%2FNew_York"
 (defun tiingo-rates-range (instrument timeframe start-timestamp end-timestamp &key (type :fx))
   (tiingo-request :type type :instrument instrument :timeframe timeframe :start-timestamp start-timestamp :end-timestamp end-timestamp))
 
-
 ;; (multiple-value-bind (start end) (random-start-date :H1 72)
 ;;   (defparameter *oanda* (oanda-rates-range :EUR_USD :H1 start end))
 ;;   (defparameter *tiingo* (tiingo-rates-range :EUR_USD :H1 start end)))
@@ -257,7 +256,7 @@ alignmentTimezone=America%2FNew_York"
 
 (defun oanda-rates-count (instrument timeframe count)
   "Gathers `COUNT` prices from Oanda."
-  (rest (assoc :candles
+  (cl:last (rest (assoc :candles
 	       (cl-json:decode-json-from-string
 		(dex:get #"https://api-fxtrade.oanda.com/v1/candles?\
 instrument=${instrument}&\
@@ -267,17 +266,8 @@ dailyAlignment=0&\
 candleFormat=bidask&\
 alignmentTimezone=America%2FNew_York"
 			 :insecure t
-			 :headers '(("X-Accept-Datetime-Format" . "UNIX")))))))
-
-
-(let ((cal (cl-dates:make-calendar :ny)))
-  ;; (cl-dates:diff-workdays (cl-dates:ymd->date 2020 7 0) (cl-dates:ymd->date 2020 7 31) cal)
-  ;; (cl-dates:date->string (cl-dates:add-workdays (cl-dates:todays-date) cal -30))
-  (cl-dates:add-workdays (cl-dates:todays-date) cal -30.9))
-
-(cl-dates:date->string (cl-dates:string->date (format nil "~a" (local-time:now))))
-
-(ceiling (/ 5000 24))
+			 :headers '(("X-Accept-Datetime-Format" . "UNIX"))))))
+	   count))
 
 (defun add-n-workdays (from-timestamp count)
   "Used by `RANDOM-START-DATE`."
