@@ -186,7 +186,7 @@ alignmentTimezone=America%2FNew_York"
 
 (defun get-rates-range (instrument timeframe from to &key (provider :tiingo) (type :fx))
   "Requests rates from `PROVIDER` in the range comprised by `FROM` and `TO`."
-  (cond ((eq provider :oanda) (oanda-rates-range instrument from to))
+  (cond ((eq provider :oanda) (oanda-rates-range instrument timeframe from to))
 	;; Tiingo is default provider.
 	(t (tiingo-rates-range instrument timeframe from to :type type))))
 
