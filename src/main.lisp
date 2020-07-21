@@ -49,7 +49,7 @@
                               #H(:pair :USD_CAD :granularity :H1 :jpy? nil)
                               #H(:pair :USD_JPY :granularity :H1 :jpy? t)))
 
-(defparameter *forex* '(:AUD_USD :EUR_GBP :EUR_JPY :EUR_USD :GBP_USD :USD_CAD :USD_CHF :USD_CNH :USD_HKD :USD_JPY))
+(defparameter *forex* '(:AUD_USD :EUR_GBP :EUR_JPY :EUR_USD :GBP_USD :USD_CAD :USD_CHF :USD_CNH :USD_JPY))
 (defparameter *indices* '(:AU200_AUD :CN50_USD :EU50_EUR
 			  :FR40_EUR
 			  :DE30_EUR
