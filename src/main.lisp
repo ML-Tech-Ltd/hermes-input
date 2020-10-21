@@ -32,6 +32,7 @@
            :get-rates
 	   :get-rates-range
 	   :get-rates-count
+	   :get-rates-count-from
 	   :get-random-rates-count
            :load-data)
   (:nicknames :ominp))
@@ -184,11 +185,17 @@ alignmentTimezone=America%2FNew_York"
            nil
            0)))
 
-(defun get-rates-range (instrument timeframe from to &key (provider :tiingo) (type :fx))
+(defun get-rates-range (instrument timeframe from to &key (provider :oanda) (type :fx))
   "Requests rates from `PROVIDER` in the range comprised by `FROM` and `TO`."
   (cond ((eq provider :oanda) (oanda-rates-range instrument timeframe from to))
 	;; Tiingo is default provider.
 	(t (tiingo-rates-range instrument timeframe from to :type type))))
+
+(defun get-rates-count-from (instrument timeframe count from &key (provider :oanda) (type :fx))
+  "Requests `COUNT` rates from `PROVIDER` in the starting from `FROM` unix timestamp."
+  (oanda-rates-count-from instrument timeframe count from))
+
+;; (get-rates-count-from :EUR_USD :H1 5 (* (local-time:timestamp-to-unix (local-time:timestamp- (local-time:now) 5 :DAY)) 1000000))
 
 (defun tiingo-rates-range (instrument timeframe start-timestamp end-timestamp &key (type :fx))
   (tiingo-request :type type :instrument instrument :timeframe timeframe :start-timestamp start-timestamp :end-timestamp end-timestamp))
@@ -214,11 +221,29 @@ alignmentTimezone=America%2FNew_York"
 			   :insecure t
 			   :headers '(("X-Accept-Datetime-Format" . "UNIX"))))))))
 
+(defun oanda-rates-count-from (instrument timeframe count from)
+  "Requests rates from Oanda in the range comprised by `FROM` and `TO`."
+  (let ((from (* from 1000000)))
+    (rest (assoc :candles
+		 (cl-json:decode-json-from-string
+		  (dex:get #"https://api-fxtrade.oanda.com/v1/candles?\
+instrument=${instrument}&\
+granularity=${timeframe}&\
+start=${from}&\
+count=${count}&\
+dailyAlignment=0&\
+candleFormat=bidask&\
+alignmentTimezone=America%2FNew_York"
+			   :insecure t
+			   :headers '(("X-Accept-Datetime-Format" . "UNIX"))))))))
+
+;; (oanda-rates-count-from :EUR_USD :H1 5 (* (local-time:timestamp-to-unix (local-time:timestamp- (local-time:now) 5 :DAY)) 1000000))
+
 (defun timeframe-for-local-time (timeframe)
   (cond ((eq timeframe :H1) :HOUR)
         ((eq timeframe :D) :DAY)))
 
-(defun get-rates-count (instrument timeframe count &key (provider :tiingo) (type :fx))
+(defun get-rates-count (instrument timeframe count &key (provider :oanda) (type :fx))
   "Requests `COUNT` rates from `PROVIDER`."
   (cond ((eq provider :oanda) (oanda-rates-count instrument timeframe count))
 	;; Tiingo is default provider.
@@ -372,7 +397,7 @@ alignmentTimezone=America%2FNew_York"
 
 ;; (tiingo-random-rates-count :EUR_USD :D 10)
 
-(defun get-random-rates-count (instrument timeframe count &key (provider :tiingo) (type :fx))
+(defun get-random-rates-count (instrument timeframe count &key (provider :oanda) (type :fx))
   "Gathers prices from `PROVIDER`."
   (cond ((eq provider :oanda) (oanda-random-rates-count instrument timeframe count))
 	;; Tiingo is default provider.
