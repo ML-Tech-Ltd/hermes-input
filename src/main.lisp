@@ -29,7 +29,7 @@
            :get-results
            :get-trades
 	   :get-transactions
-           :get-rates
+           :get-rates-batches
 	   :get-rates-range
 	   :get-rates-count
 	   :get-rates-count-from
@@ -150,13 +150,13 @@
   "TODO: Adapt code for Tiingo instead of Oanda."
   (string-downcase (cl-ppcre:regex-replace-all "_" (format nil "~a" instrument) "")))
 
-(defun get-rates (instrument howmany-batches granularity)
+(defun get-rates-batches (instrument granularity howmany-batches)
   "Gathers prices from Oanda.
 A batch = 5,000 rates."
   (labels ((recur (end result counter)
              (let ((candles (ignore-errors
-                              (rest (assoc :candles (cl-json:decode-json-from-string
-                                                     (dex:get #"https://api-fxtrade.oanda.com/v1/candles?\
+			     (rest (assoc :candles (cl-json:decode-json-from-string
+						    (dex:get #"https://api-fxtrade.oanda.com/v1/candles?\
 instrument=${instrument}&\
 granularity=${granularity}&\
 count=5000&\
@@ -164,19 +164,21 @@ end=${end}&\
 dailyAlignment=0&\
 candleFormat=bidask&\
 alignmentTimezone=America%2FNew_York"
-                                                              :insecure t
-                                                              :headers '(("X-Accept-Datetime-Format" . "UNIX")))))))))
+							     :insecure t
+							     :headers '(("X-Accept-Datetime-Format" . "UNIX")))))))))
                (sleep 0.5)
                (if (and candles (< counter howmany-batches))
                    (recur (read-from-string
                            (rest (assoc :time (first candles))))
-                          (append (map (lm (candle)
-                                         (list (assoc :close-bid candle)
-                                               (assoc :open-bid candle)
-                                               (assoc :high-bid candle)
-                                               (assoc :low-bid candle)
-                                               (assoc :time candle)))
-                                       candles)
+                          ;; (append (map (lm (candle)
+                          ;;                (list (assoc :close-bid candle)
+                          ;;                      (assoc :open-bid candle)
+                          ;;                      (assoc :high-bid candle)
+                          ;;                      (assoc :low-bid candle)
+                          ;;                      (assoc :time candle)))
+                          ;;              candles)
+                          ;;         result)
+			  (append candles
                                   result)
                           (incf counter))
                    result))))
