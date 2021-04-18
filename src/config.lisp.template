@@ -1,4 +1,4 @@
-(defpackage overmind-input.config
+(defpackage hermes-input.config
   (:use :cl)
   (:export :*tiingo-token*
 	   :*oanda-token*

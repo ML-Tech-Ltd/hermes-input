@@ -1,10 +1,10 @@
-(defpackage overmind-input/tests/main
+(defpackage hermes-input/tests/main
   (:use :cl
-        :overmind-input
+        :hermes-input
         :rove))
-(in-package :overmind-input/tests/main)
+(in-package :hermes-input/tests/main)
 
-;; NOTE: To run this test file, execute `(asdf:test-system :overmind-input)' in your Lisp.
+;; NOTE: To run this test file, execute `(asdf:test-system :hermes-input)' in your Lisp.
 
 (deftest test-target-1
   (testing "should (= 1 1) to be true"

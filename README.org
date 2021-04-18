@@ -1,4 +1,4 @@
-* Overmind-Input 
+* Hermes Input 
 
 ** Usage
 
