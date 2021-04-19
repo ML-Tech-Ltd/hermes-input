@@ -1,9 +1,9 @@
 (defpackage hermes-input.db
   (:use :cl)
   (:export #:conn)
-  (:nicknames :ominp.db))
+  (:nicknames :hsinp.db))
 (in-package :hermes-input.db)
 
 (defmacro conn (&rest body)
-  `(postmodern:with-connection (list ,omcom.db:*db-name* ,omcom.db:*db-user* ,omcom.db:*db-pass* ,omcom.db:*db-hostname*)
+  `(postmodern:with-connection (list ,hscom.db:*db-name* ,hscom.db:*db-user* ,hscom.db:*db-pass* ,hscom.db:*db-hostname*)
      ,@body))

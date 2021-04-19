@@ -1,14 +1,14 @@
 (defpackage hermes-input.api
   (:use #:cl #:postmodern)
-  (:import-from #:ominp.db
+  (:import-from #:hsinp.db
 		#:conn)
-  (:import-from #:ominp.rates
+  (:import-from #:hsinp.rates
 		#:get-rates-count-from-big
 		#:get-rates-count-big
 		#:get-rates-random-count-big
 		#:get-rates-range-big)
   (:export #:get-rates)
-  (:nicknames #:ominp.api))
+  (:nicknames #:hsinp.api))
 (in-package :hermes-input.api)
 
 (defun whent (condition then)

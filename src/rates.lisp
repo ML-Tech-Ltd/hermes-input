@@ -1,13 +1,13 @@
 (defpackage hermes-input.rates
-  (:nicknames #:ominp.rates)
+  (:nicknames #:hsinp.rates)
   (:use #:cl #:alexandria #:postmodern)
-  (:import-from #:omcom.utils
+  (:import-from #:hscom.utils
 		#:format-table
 		#:assoccess
 		#:random-int)
-  (:import-from #:ominp.config
+  (:import-from #:hsinp.config
 		#:*tiingo-token*)
-  (:import-from #:ominp.db
+  (:import-from #:hsinp.db
 		#:conn)
   (:export #:->close
 	   #:->high
@@ -140,9 +140,9 @@
 
 (defun init (howmany-batches &key (timeframes '(:H1 :M1)))
   "INIT populates the `rates` table with batches of rates (a batch is
-5000 rates) for each instrument in `omcom.omage:*forex*` for each timeframe
+5000 rates) for each instrument in `hscom.hsage:*forex*` for each timeframe
 in `timeframes`."
-  (let ((instruments omcom.omage:*forex*))
+  (let ((instruments hscom.hsage:*forex*))
     (loop for instrument in instruments
 	  do (loop for timeframe in timeframes
 		   do (let ((rates (get-rates-batches instrument timeframe howmany-batches)))
@@ -189,13 +189,13 @@ in `timeframes`."
 	       (push -w w)
 	       ))
     w))
-;; (-get-weight-ffd omcom.omage:*fracdiff-d* omcom.omage:*fracdiff-threshold* 10)
+;; (-get-weight-ffd hscom.hsage:*fracdiff-d* hscom.hsage:*fracdiff-threshold* 10)
 
 (defun -dot-product (a b)
   (apply #'+ (mapcar #'* (coerce a 'list) (coerce b 'list))))
 
 (defun fracdiff (rates &key (rate-fn #'->close))
-  (let* ((w (-get-weight-ffd omcom.omage:*fracdiff-d* omcom.omage:*fracdiff-threshold* (length rates)))
+  (let* ((w (-get-weight-ffd hscom.hsage:*fracdiff-d* hscom.hsage:*fracdiff-threshold* (length rates)))
 	 (width (1- (length w)))
 	 ;; (output (make-list width :initial-element 0.0))
 	 )
@@ -316,7 +316,7 @@ in `timeframes`."
 				  (1- count)
 				  :alists)))
 	    (last recent))))
-;; (get-rates-count-big :EUR_USD omcom.omage:*train-tf* 10)
+;; (get-rates-count-big :EUR_USD hscom.hsage:*train-tf* 10)
 
 (defun get-rates-random-count-big (instrument timeframe count)
   "Assumes a minimum of 50K rates"
@@ -328,7 +328,7 @@ in `timeframes`."
 				  '$1 '$2)
 			  count offset
 			  :alists)))))
-;; (get-rates-random-count-big :EUR_USD omcom.omage:*train-tf* 10)
+;; (get-rates-random-count-big :EUR_USD hscom.hsage:*train-tf* 10)
 
 (defun get-rates-range-big (instrument timeframe from to)
   (let ((recent (get-rates-count instrument timeframe 100)))
@@ -941,17 +941,17 @@ be returned using the calculated timestamp."
 (defun get-tp-sl (rates &optional (lookahead-count 10) (symmetricp nil))
   ;; We need to use `rate-open` because we're starting at that price after
   ;; calculating the inputs before this rate.
-  (let* ((init-rate-ask (ominp.rates:->open-ask (first rates)))
-	 (init-rate-bid (ominp.rates:->open-bid (first rates)))
+  (let* ((init-rate-ask (hsinp.rates:->open-ask (first rates)))
+	 (init-rate-bid (hsinp.rates:->open-bid (first rates)))
 	 (max-pos-ask 0)
 	 (max-pos-bid 0)
 	 (max-neg-ask 0)
 	 (max-neg-bid 0))
     (loop for rate in (subseq rates 0 lookahead-count)
-	  do (let ((delta-high-ask (- (ominp.rates:->high-ask rate) init-rate-bid)) ;; Started as sell order, then close as ask.
-		   (delta-high-bid (- (ominp.rates:->high-bid rate) init-rate-ask)) ;; Started as buy order, then close as bid.
-		   (delta-low-ask (- (ominp.rates:->low-ask rate) init-rate-bid))
-		   (delta-low-bid (- (ominp.rates:->low-bid rate) init-rate-ask)))
+	  do (let ((delta-high-ask (- (hsinp.rates:->high-ask rate) init-rate-bid)) ;; Started as sell order, then close as ask.
+		   (delta-high-bid (- (hsinp.rates:->high-bid rate) init-rate-ask)) ;; Started as buy order, then close as bid.
+		   (delta-low-ask (- (hsinp.rates:->low-ask rate) init-rate-bid))
+		   (delta-low-bid (- (hsinp.rates:->low-bid rate) init-rate-ask)))
 	       ;; Checking for possible price stagnation. If true, ignore.
 	       ;; (unless (and (< init-rate delta-high)
 	       ;; 		    (> init-rate delta-low))
