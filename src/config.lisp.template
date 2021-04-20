@@ -1,8 +1,10 @@
 (defpackage hermes-input.config
-  (:use :cl)
-  (:export :*tiingo-token*
-	   :*oanda-token*
-	   :*oanda-account*))
+  (:use #:cl)
+  (:export #:*tiingo-token*
+	   #:*oanda-token*
+	   #:*oanda-account*)
+  (:nicknames #:hsinp.config))
+(in-package :hermes-input.config)
 
 (defparameter *tiingo-token* "")
 (defparameter *oanda-token* "")
