@@ -1,5 +1,4 @@
 (defpackage hermes-input.rates
-  (:nicknames #:hsinp.rates)
   (:use #:cl #:alexandria #:postmodern)
   (:import-from #:hscom.utils
 		#:format-table
@@ -50,7 +49,8 @@
 	   #:get-rates-count-from
 	   #:get-random-rates-count
 	   #:get-tp-sl
-	   #:*creation-training-datasets*))
+	   #:*creation-training-datasets*)
+  (:nicknames #:hsinp.rates))
 (in-package :hermes-input.rates)
 
 (defparameter *creation-training-datasets* (make-hash-table :test 'equal :synchronized t))
