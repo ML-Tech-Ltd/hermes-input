@@ -451,6 +451,7 @@ in `timeframes`."
 			  (setf winner-to (+ idx chunk-plus))))))
     (values winner-from winner-to)))
 
+;; (defparameter *rates* (hsinp.rates:fracdiff (hsinp.rates:get-rates-count-big :AUD_USD :H1 10000)))
 ;; (get-rates-chunk-of-types *rates* '(:bullish) :min-chunk-size 300 :max-chunk-size 601 :slide-step 50)
 
 ;; (get-rates-chunk-of-types (subseq *rates* 0 500) '(:bullish))
