@@ -3,6 +3,7 @@
   (:import-from #:hscom.utils
 		#:format-table
 		#:assoccess
+		#:comment
 		#:random-int)
   (:import-from #:hsinp.config
 		#:*tiingo-token*)
@@ -13,6 +14,8 @@
 	   #:->low
 	   #:->open
 	   #:->close-frac
+	   #:->high-frac
+	   #:->low-frac
 	   #:->close-bid
 	   #:->close-ask
 	   #:->low-bid
@@ -114,6 +117,14 @@
   "Returns the fractionally differentiatied rate-close."
   (assoccess rate :close-frac))
 
+(defun ->high-frac (rate)
+  "Returns the fractionally differentiatied rate-high."
+  (assoccess rate :high-frac))
+
+(defun ->low-frac (rate)
+  "Returns the fractionally differentiatied rate-low."
+  (assoccess rate :low-frac))
+
 (defun ->close-bid (rate)
   (assoccess rate :close-bid))
 
@@ -194,20 +205,114 @@ in `timeframes`."
 (defun -dot-product (a b)
   (apply #'+ (mapcar #'* (coerce a 'list) (coerce b 'list))))
 
-(defun fracdiff (rates &key (rate-fn #'->close))
+(comment
+ (-dot-product '(0.60928 
+		 0.6112799999999999 
+		 0.61032 
+		 0.60947 
+		 0.60934 
+		 0.61034 
+		 0.6101399999999999 
+		 0.61136 
+		 0.61125 
+		 0.6128599999999998 
+		 0.6120299999999999 
+		 0.61327 
+		 0.61338 
+		 0.6145999999999999 
+		 0.6137699999999999 
+		 0.61248 
+		 0.61132 
+		 0.6107199999999999 
+		 0.6100799999999998 
+		 0.60973 
+		 0.60886 
+		 0.60888 
+		 0.61137 
+		 0.61229 
+		 0.61223 
+		 0.61304 
+		 0.61423 
+		 0.61372 
+		 0.61249 
+		 0.61413 
+		 0.6151399999999999 
+		 0.6146199999999999 
+		 0.61395 
+		 0.61461 
+		 0.6127 
+		 0.61393 
+		 0.6143 
+		 0.61435 
+		 0.61542)
+	       '(0.60976 
+		 0.61318 
+		 0.61181 
+		 0.61052 
+		 0.60969 
+		 0.61107 
+		 0.6110099999999999 
+		 0.61154 
+		 0.61191 
+		 0.61302 
+		 0.6128999999999999 
+		 0.6150799999999998 
+		 0.61408 
+		 0.61496 
+		 0.6148299999999999 
+		 0.61401 
+		 0.61281 
+		 0.61144 
+		 0.6106999999999999 
+		 0.61026 
+		 0.60982 
+		 0.60905 
+		 0.612 
+		 0.61314 
+		 0.6125 
+		 0.6131299999999998 
+		 0.61459 
+		 0.61428 
+		 0.61378 
+		 0.61439 
+		 0.61536 
+		 0.61565 
+		 0.61469 
+		 0.61471 
+		 0.61496 
+		 0.61435 
+		 0.61509 
+		 0.61467 
+		 0.6156199999999998 )))
+
+(defun fracdiff (rates)
   (let* ((w (-get-weight-ffd hscom.hsage:*fracdiff-d* hscom.hsage:*fracdiff-threshold* (length rates)))
 	 (width (1- (length w)))
 	 ;; (output (make-list width :initial-element 0.0))
 	 )
     (loop for i in (iota (- (length rates) width) :start width)
-    	  do (let ((x (mapcar rate-fn (subseq rates (- i width) (1+ i)))))
+    	  do (let ((closes (mapcar #'->close (subseq rates (- i width) (1+ i))))
+		   (highs (mapcar #'->high (subseq rates (- i width) (1+ i))))
+		   (lows (mapcar #'->low (subseq rates (- i width) (1+ i)))))
 	       ;; (push (-dot-product w x) output)
 	       (push
-	       	`(:close-frac . ,(-dot-product w x))
+	       	`(:close-frac . ,(-dot-product w closes))
+	       	(nth i rates))
+	       (push
+	       	`(:high-frac . ,(-dot-product w highs))
+	       	(nth i rates))
+	       (push
+	       	`(:low-frac . ,(-dot-product w lows))
 	       	(nth i rates))
 	       ))
     (subseq rates width)))
-;; (fracdiff *rates*)
+;; (fracdiff hsper::*rates*)
+
+;; (defparameter *rates* (hsinp.rates::fracdiff (hsinp.rates::get-rates-random-count-big :AUD_USD :M15 10000)))
+
+(comment
+ (loop for rate in (fracdiff *rates*)
+       do (print (assoccess rate :high-bid))))
 
 (defun insert-rates (instrument timeframe rates)
   (conn
