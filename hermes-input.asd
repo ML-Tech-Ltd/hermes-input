@@ -18,7 +18,6 @@
   :components ((:module "src"
                 :components
                 ((:file "main" :depends-on ("config"))
-		 (:file "db")
 		 (:file "api" :depends-on ("rates"))
 		 (:file "rates")
 		 (:file "config"))))

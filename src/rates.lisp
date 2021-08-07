@@ -7,7 +7,7 @@
 		#:random-int)
   (:import-from #:hsinp.config
 		#:*tiingo-token*)
-  (:import-from #:hsinp.db
+  (:import-from #:hscom.db
 		#:conn)
   (:export #:->close
 	   #:->high

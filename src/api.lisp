@@ -1,6 +1,6 @@
 (defpackage hermes-input.api
   (:use #:cl #:postmodern)
-  (:import-from #:hsinp.db
+  (:import-from #:hscom.db
 		#:conn)
   (:import-from #:hsinp.rates
 		#:get-rates-count-from-big
