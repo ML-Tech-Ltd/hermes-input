@@ -520,9 +520,8 @@ A batch = 5,000 rates."
   (labels ((recur (end result counter)
              (let ((candles (ignore-errors
 			     (rest (assoc :candles (cl-json:decode-json-from-string
-						    (dex:get (format nil "https://api-fxtrade.oanda.com/v1/candles~
-?instrument=~a~
-&granularity=~a~
+						    (dex:get (format nil "https://api-fxtrade.oanda.com/v3/instruments/~a/candles~
+?granularity=~a~
 &count=5000~
 &end=~a~
 &dailyAlignment=0~
@@ -579,9 +578,8 @@ A batch = 5,000 rates."
 	(to (* to 1000000)))
     (rest (assoc :candles
 		 (cl-json:decode-json-from-string
-		  (dex:get (format nil "https://api-fxtrade.oanda.com/v1/candles~
-?instrument=~a~
-&granularity=~a~
+		  (dex:get (format nil "https://api-fxtrade.oanda.com/v3/instruments/~a/candles~
+?granularity=~a~
 &start=~a~
 &end=~a~
 &dailyAlignment=0~
@@ -599,9 +597,8 @@ A batch = 5,000 rates."
   (let ((from (* from 1000000)))
     (rest (assoc :candles
 		 (cl-json:decode-json-from-string
-		  (dex:get (format nil "https://api-fxtrade.oanda.com/v1/candles~
-?instrument=~a~
-&granularity=~a~
+		  (dex:get (format nil "https://api-fxtrade.oanda.com/v3/instruments/~a/candles~
+?granularity=~a~
 &start=~a~
 &count=~a~
 &dailyAlignment=0~
@@ -645,9 +642,8 @@ A batch = 5,000 rates."
   "Gathers `COUNT` prices from Oanda."
   (cl:last (rest (assoc :candles
 	       (cl-json:decode-json-from-string
-		(dex:get (format nil "https://api-fxtrade.oanda.com/v1/candles~
-?instrument=~a~
-&granularity=~a~
+		(dex:get (format nil "https://api-fxtrade.oanda.com/v3/instruments/~a/candles~
+?granularity=~a~
 &count=~a~
 &dailyAlignment=0~
 &candleFormat=bidask~
@@ -716,9 +712,8 @@ be returned using the calculated timestamp."
   (multiple-value-bind (start end) (random-start-date timeframe count)
     (subseq (rest (assoc :candles
 			 (cl-json:decode-json-from-string
-			  (dex:get (format nil "https://api-fxtrade.oanda.com/v1/candles~
-?instrument=~a~
-&granularity=~a~
+			  (dex:get (format nil "https://api-fxtrade.oanda.com/v3/instruments/~a/candles~
+?granularity=~a~
 &start=~a~
 &end=~a~
 &dailyAlignment=0~
