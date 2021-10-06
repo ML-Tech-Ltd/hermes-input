@@ -6,7 +6,8 @@
 		#:comment
 		#:random-int)
   (:import-from #:hsinp.config
-		#:*tiingo-token*)
+		#:*tiingo-token*
+		#:*oanda-token*)
   (:import-from #:hscom.db
 		#:conn)
   (:export #:->close
@@ -241,20 +242,22 @@ in `timeframes`."
 	 do (when (assoccess rate :complete)
 	      (let ((time (assoccess rate :time))
 		    (instrument (format nil "~a" instrument))
-		    (timeframe (format nil "~a" timeframe)))
+		    (timeframe (format nil "~a" timeframe))
+		    (bids (assoccess rate :bid))
+		    (asks (assoccess rate :ask)))
 		(unless (get-dao 'rate time instrument timeframe)
 		  (make-dao 'rate
 			    :time time
 			    :instrument instrument
 			    :timeframe timeframe
-			    :open-bid (assoccess rate :open-bid)
-			    :open-ask (assoccess rate :open-ask)
-			    :high-bid (assoccess rate :high-bid)
-			    :high-ask (assoccess rate :high-ask)
-			    :low-bid (assoccess rate :low-bid)
-			    :low-ask (assoccess rate :low-ask)
-			    :close-bid (assoccess rate :close-bid)
-			    :close-ask (assoccess rate :close-ask)
+			    :open-bid (assoccess bids :o)
+			    :open-ask (assoccess asks :o)
+			    :high-bid (assoccess bids :h)
+			    :high-ask (assoccess asks :h)
+			    :low-bid (assoccess bids :l)
+			    :low-ask (assoccess asks :l)
+			    :close-bid (assoccess bids :c)
+			    :close-ask (assoccess asks :c)
 			    :volume (assoccess rate :volume)
 			    )))))))
 
@@ -522,6 +525,7 @@ A batch = 5,000 rates."
 			     (rest (assoc :candles (cl-json:decode-json-from-string
 						    (dex:get (format nil "https://api-fxtrade.oanda.com/v3/instruments/~a/candles~
 ?granularity=~a~
+&price=BA~
 &count=5000~
 &end=~a~
 &dailyAlignment=0~
@@ -531,7 +535,8 @@ A batch = 5,000 rates."
 								     granularity
 								     end)
 							     :insecure t
-							     :headers '(("X-Accept-Datetime-Format" . "UNIX")))))))))
+							     :headers `(("X-Accept-Datetime-Format" . "UNIX")
+									("Authorization" . ,(format nil "Bearer ~a" *oanda-token*))))))))))
                (sleep 0.5)
                (if (and candles (< counter howmany-batches))
                    (recur (read-from-string
@@ -580,6 +585,7 @@ A batch = 5,000 rates."
 		 (cl-json:decode-json-from-string
 		  (dex:get (format nil "https://api-fxtrade.oanda.com/v3/instruments/~a/candles~
 ?granularity=~a~
+&price=BA~
 &start=~a~
 &end=~a~
 &dailyAlignment=0~
@@ -590,7 +596,8 @@ A batch = 5,000 rates."
 				   from
 				   to)
 			   :insecure t
-			   :headers '(("X-Accept-Datetime-Format" . "UNIX"))))))))
+			   :headers `(("X-Accept-Datetime-Format" . "UNIX")
+				      ("Authorization" . ,(format nil "Bearer ~a" *oanda-token*)))))))))
 
 (defun oanda-rates-count-from (instrument timeframe count from)
   "Requests rates from Oanda in the range comprised by `FROM` and `TO`."
@@ -599,6 +606,7 @@ A batch = 5,000 rates."
 		 (cl-json:decode-json-from-string
 		  (dex:get (format nil "https://api-fxtrade.oanda.com/v3/instruments/~a/candles~
 ?granularity=~a~
+&price=BA~
 &start=~a~
 &count=~a~
 &dailyAlignment=0~
@@ -609,7 +617,8 @@ A batch = 5,000 rates."
 				   from
 				   count)
 			   :insecure t
-			   :headers '(("X-Accept-Datetime-Format" . "UNIX"))))))))
+			   :headers `(("X-Accept-Datetime-Format" . "UNIX")
+				      ("Authorization" . ,(format nil "Bearer ~a" *oanda-token*)))))))))
 
 ;; (oanda-rates-count-from :EUR_USD :H1 5 (* (local-time:timestamp-to-unix (local-time:timestamp- (local-time:now) 5 :DAY)) 1000000))
 
@@ -641,19 +650,23 @@ A batch = 5,000 rates."
 (defun oanda-rates-count (instrument timeframe count)
   "Gathers `COUNT` prices from Oanda."
   (cl:last (rest (assoc :candles
-	       (cl-json:decode-json-from-string
-		(dex:get (format nil "https://api-fxtrade.oanda.com/v3/instruments/~a/candles~
+		        (cl-json:decode-json-from-string
+			 (dex:get (format nil "https://api-fxtrade.oanda.com/v3/instruments/~a/candles~
 ?granularity=~a~
+&price=BA~
 &count=~a~
 &dailyAlignment=0~
 &candleFormat=bidask~
 &alignmentTimezone=America%2FNew_York"
-				 instrument
-				 timeframe
-				 count)
-			 :insecure t
-			 :headers '(("X-Accept-Datetime-Format" . "UNIX"))))))
+					  instrument
+					  timeframe
+					  count)
+				  :insecure t
+				  :headers `(("X-Accept-Datetime-Format" . "UNIX")
+					     ("Authorization" . ,(format nil "Bearer ~a" *oanda-token*))))
+			 )))
 	   count))
+;; (oanda-rates-count :EUR_USD :M15 2)
 
 (defun add-n-workdays (from-timestamp count)
   "Used by `RANDOM-START-DATE`."
@@ -714,6 +727,7 @@ be returned using the calculated timestamp."
 			 (cl-json:decode-json-from-string
 			  (dex:get (format nil "https://api-fxtrade.oanda.com/v3/instruments/~a/candles~
 ?granularity=~a~
+&price=BA~
 &start=~a~
 &end=~a~
 &dailyAlignment=0~
@@ -724,7 +738,8 @@ be returned using the calculated timestamp."
 					   start
 					   end)
 				   :insecure t
-				   :headers '(("X-Accept-Datetime-Format" . "UNIX"))))))
+				   :headers `(("X-Accept-Datetime-Format" . "UNIX")
+					      ("Authorization" . ,(format nil "Bearer ~a" *oanda-token*)))))))
 	    0 count)))
 
 ;; (length (tiingo-random-rates-count :EUR_USD :D 10))
