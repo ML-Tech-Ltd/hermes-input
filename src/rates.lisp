@@ -242,22 +242,20 @@ in `timeframes`."
 	 do (when (assoccess rate :complete)
 	      (let ((time (assoccess rate :time))
 		    (instrument (format nil "~a" instrument))
-		    (timeframe (format nil "~a" timeframe))
-		    (bids (assoccess rate :bid))
-		    (asks (assoccess rate :ask)))
+		    (timeframe (format nil "~a" timeframe)))
 		(unless (get-dao 'rate time instrument timeframe)
 		  (make-dao 'rate
 			    :time time
 			    :instrument instrument
 			    :timeframe timeframe
-			    :open-bid (assoccess bids :o)
-			    :open-ask (assoccess asks :o)
-			    :high-bid (assoccess bids :h)
-			    :high-ask (assoccess asks :h)
-			    :low-bid (assoccess bids :l)
-			    :low-ask (assoccess asks :l)
-			    :close-bid (assoccess bids :c)
-			    :close-ask (assoccess asks :c)
+			    :open-bid (assoccess rate :open-bid)
+			    :open-ask (assoccess rate :open-ask)
+			    :high-bid (assoccess rate :high-bid)
+			    :high-ask (assoccess rate :high-ask)
+			    :low-bid (assoccess rate :low-bid)
+			    :low-ask (assoccess rate :low-ask)
+			    :close-bid (assoccess rate :close-bid)
+			    :close-ask (assoccess rate :close-ask)
 			    :volume (assoccess rate :volume)
 			    )))))))
 
@@ -353,6 +351,7 @@ in `timeframes`."
 	  (append prev
 		  (last recent))))))
 ;; (get-rates-count-big :EUR_USD hscom.hsage:*train-tf* 10)
+;; (get-rates-count :EUR_USD hscom.hsage:*train-tf* 10)
 
 (defun get-rates-random-count-big (instrument timeframe count)
   "Assumes a minimum of 50K rates"
@@ -520,10 +519,11 @@ in `timeframes`."
 (defun get-rates-batches (instrument granularity howmany-batches)
   "Gathers prices from Oanda.
 A batch = 5,000 rates."
-  (labels ((recur (end result counter)
-             (let ((candles (ignore-errors
-			     (rest (assoc :candles (cl-json:decode-json-from-string
-						    (dex:get (format nil "https://api-fxtrade.oanda.com/v3/instruments/~a/candles~
+  (oanda-v3-fix-rates
+   (labels ((recur (end result counter)
+	      (let ((candles (ignore-errors
+			      (rest (assoc :candles (cl-json:decode-json-from-string
+						     (dex:get (format nil "https://api-fxtrade.oanda.com/v3/instruments/~a/candles~
 ?granularity=~a~
 &price=BA~
 &count=5000~
@@ -531,32 +531,32 @@ A batch = 5,000 rates."
 &dailyAlignment=0~
 &candleFormat=bidask~
 &alignmentTimezone=America%2FNew_York"
-								     instrument
-								     granularity
-								     end)
-							     :insecure t
-							     :headers `(("X-Accept-Datetime-Format" . "UNIX")
-									("Authorization" . ,(format nil "Bearer ~a" *oanda-token*))))))))))
-               (sleep 0.5)
-               (if (and candles (< counter howmany-batches))
-                   (recur (read-from-string
-                           (rest (assoc :time (first candles))))
-                          ;; (append (mapcar (lambda (candle)
-                          ;;                (list (assoc :close-bid candle)
-                          ;;                      (assoc :open-bid candle)
-                          ;;                      (assoc :high-bid candle)
-                          ;;                      (assoc :low-bid candle)
-                          ;;                      (assoc :time candle)))
-                          ;;              candles)
-                          ;;         result)
-			  (append candles
-                                  result)
-                          (incf counter))
-                   result))))
+								      instrument
+								      granularity
+								      end)
+							      :insecure t
+							      :headers `(("Accept-Datetime-Format" . "UNIX")
+									 ("Authorization" . ,(format nil "Bearer ~a" *oanda-token*))))))))))
+		(sleep 0.5)
+		(if (and candles (< counter howmany-batches))
+		    (recur (read-from-string
+			    (rest (assoc :time (first candles))))
+			   ;; (append (mapcar (lambda (candle)
+			   ;;                (list (assoc :close-bid candle)
+			   ;;                      (assoc :open-bid candle)
+			   ;;                      (assoc :high-bid candle)
+			   ;;                      (assoc :low-bid candle)
+			   ;;                      (assoc :time candle)))
+			   ;;              candles)
+			   ;;         result)
+			   (append candles
+				   result)
+			   (incf counter))
+		    result))))
   
-    (recur (* (local-time:timestamp-to-unix (local-time:now)) 1000000)
-           nil
-           0)))
+     (recur (* (local-time:timestamp-to-unix (local-time:now)) 1000000)
+	    nil
+	    0))))
 
 (defun get-rates-range (instrument timeframe from to &key (provider :oanda) (type :fx))
   "Requests rates from `PROVIDER` in the range comprised by `FROM` and `TO`."
@@ -581,9 +581,10 @@ A batch = 5,000 rates."
   "Requests rates from Oanda in the range comprised by `FROM` and `TO`."
   (let ((from (* from 1000000))
 	(to (* to 1000000)))
-    (rest (assoc :candles
-		 (cl-json:decode-json-from-string
-		  (dex:get (format nil "https://api-fxtrade.oanda.com/v3/instruments/~a/candles~
+    (oanda-v3-fix-rates
+     (rest (assoc :candles
+		  (cl-json:decode-json-from-string
+		   (dex:get (format nil "https://api-fxtrade.oanda.com/v3/instruments/~a/candles~
 ?granularity=~a~
 &price=BA~
 &start=~a~
@@ -591,20 +592,21 @@ A batch = 5,000 rates."
 &dailyAlignment=0~
 &candleFormat=bidask~
 &alignmentTimezone=America%2FNew_York"
-				   instrument
-				   timeframe
-				   from
-				   to)
-			   :insecure t
-			   :headers `(("X-Accept-Datetime-Format" . "UNIX")
-				      ("Authorization" . ,(format nil "Bearer ~a" *oanda-token*)))))))))
+				    instrument
+				    timeframe
+				    from
+				    to)
+			    :insecure t
+			    :headers `(("Accept-Datetime-Format" . "UNIX")
+				       ("Authorization" . ,(format nil "Bearer ~a" *oanda-token*))))))))))
 
 (defun oanda-rates-count-from (instrument timeframe count from)
   "Requests rates from Oanda in the range comprised by `FROM` and `TO`."
   (let ((from (* from 1000000)))
-    (rest (assoc :candles
-		 (cl-json:decode-json-from-string
-		  (dex:get (format nil "https://api-fxtrade.oanda.com/v3/instruments/~a/candles~
+    (oanda-v3-fix-rates
+     (rest (assoc :candles
+		  (cl-json:decode-json-from-string
+		   (dex:get (format nil "https://api-fxtrade.oanda.com/v3/instruments/~a/candles~
 ?granularity=~a~
 &price=BA~
 &start=~a~
@@ -612,13 +614,13 @@ A batch = 5,000 rates."
 &dailyAlignment=0~
 &candleFormat=bidask~
 &alignmentTimezone=America%2FNew_York"
-				   instrument
-				   timeframe
-				   from
-				   count)
-			   :insecure t
-			   :headers `(("X-Accept-Datetime-Format" . "UNIX")
-				      ("Authorization" . ,(format nil "Bearer ~a" *oanda-token*)))))))))
+				    instrument
+				    timeframe
+				    from
+				    count)
+			    :insecure t
+			    :headers `(("Accept-Datetime-Format" . "UNIX")
+				       ("Authorization" . ,(format nil "Bearer ~a" *oanda-token*))))))))))
 
 ;; (oanda-rates-count-from :EUR_USD :H1 5 (* (local-time:timestamp-to-unix (local-time:timestamp- (local-time:now) 5 :DAY)) 1000000))
 
@@ -647,25 +649,42 @@ A batch = 5,000 rates."
 ;; (defparameter *oanda* (oanda-rates-count :EUR_USD :H4 20))
 ;; (defparameter *tiingo* (tiingo-rates-count :EUR_USD :D 20))
 
+(defun oanda-v3-fix-rates (rates)
+  (loop for rate in rates
+	collect (let ((bids (assoccess rate :bid))
+		      (asks (assoccess rate :ask)))
+		  `(,(assoc :complete rate)
+		    ,(assoc :volume rate)
+		    (:time . ,(format nil "~a" (round (* 1000000 (read-from-string (assoccess rate :time))))))
+		    (:open-bid .,(read-from-string (assoccess bids :o)))
+		    (:high-bid .,(read-from-string (assoccess bids :h)))
+		    (:low-bid .,(read-from-string (assoccess bids :l)))
+		    (:close-bid .,(read-from-string (assoccess bids :c)))
+		    (:open-ask .,(read-from-string (assoccess asks :o)))
+		    (:high-ask .,(read-from-string (assoccess asks :h)))
+		    (:low-ask .,(read-from-string (assoccess asks :l)))
+		    (:close-ask .,(read-from-string (assoccess asks :c)))))))
+
 (defun oanda-rates-count (instrument timeframe count)
   "Gathers `COUNT` prices from Oanda."
-  (cl:last (rest (assoc :candles
-		        (cl-json:decode-json-from-string
-			 (dex:get (format nil "https://api-fxtrade.oanda.com/v3/instruments/~a/candles~
+  (oanda-v3-fix-rates
+   (cl:last (rest (assoc :candles
+			 (cl-json:decode-json-from-string
+			  (dex:get (format nil "https://api-fxtrade.oanda.com/v3/instruments/~a/candles~
 ?granularity=~a~
 &price=BA~
 &count=~a~
 &dailyAlignment=0~
 &candleFormat=bidask~
 &alignmentTimezone=America%2FNew_York"
-					  instrument
-					  timeframe
-					  count)
-				  :insecure t
-				  :headers `(("X-Accept-Datetime-Format" . "UNIX")
-					     ("Authorization" . ,(format nil "Bearer ~a" *oanda-token*))))
-			 )))
-	   count))
+					   instrument
+					   timeframe
+					   count)
+				   :insecure t
+				   :headers `(("Accept-Datetime-Format" . "UNIX")
+					      ("Authorization" . ,(format nil "Bearer ~a" *oanda-token*))))
+			  )))
+	    count)))
 ;; (oanda-rates-count :EUR_USD :M15 2)
 
 (defun add-n-workdays (from-timestamp count)
@@ -723,9 +742,10 @@ be returned using the calculated timestamp."
 
 (defun oanda-random-rates-count (instrument timeframe count)
   (multiple-value-bind (start end) (random-start-date timeframe count)
-    (subseq (rest (assoc :candles
-			 (cl-json:decode-json-from-string
-			  (dex:get (format nil "https://api-fxtrade.oanda.com/v3/instruments/~a/candles~
+    (oanda-v3-fix-rates
+     (subseq (rest (assoc :candles
+			  (cl-json:decode-json-from-string
+			   (dex:get (format nil "https://api-fxtrade.oanda.com/v3/instruments/~a/candles~
 ?granularity=~a~
 &price=BA~
 &start=~a~
@@ -733,14 +753,14 @@ be returned using the calculated timestamp."
 &dailyAlignment=0~
 &candleFormat=bidask~
 &alignmentTimezone=America%2FNew_York"
-					   instrument
-					   timeframe
-					   start
-					   end)
-				   :insecure t
-				   :headers `(("X-Accept-Datetime-Format" . "UNIX")
-					      ("Authorization" . ,(format nil "Bearer ~a" *oanda-token*)))))))
-	    0 count)))
+					    instrument
+					    timeframe
+					    start
+					    end)
+				    :insecure t
+				    :headers `(("Accept-Datetime-Format" . "UNIX")
+					       ("Authorization" . ,(format nil "Bearer ~a" *oanda-token*)))))))
+	     0 count))))
 
 ;; (length (tiingo-random-rates-count :EUR_USD :D 10))
 
@@ -766,7 +786,6 @@ be returned using the calculated timestamp."
 	(t "https://api.tiingo.com/tiingo/")))
 
 (defun preprocess-rates-for-tiingo (rates)
-  ;; (print rates)
   (loop for rate in rates collect
        `((:open-bid . ,(access:access rate :open))
 	 (:close-bid . ,(access:access rate :close))
