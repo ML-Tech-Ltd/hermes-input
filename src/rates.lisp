@@ -582,7 +582,7 @@ A batch = 5,000 rates."
   (let ((from (* from 1000000))
         (to (* to 1000000)))
     (oanda-v3-fix-rates
-     (rest (assoc :|candles|
+     (rest (assoc :candles
                   (cl-json:decode-json-from-string
                    (dex:get (format nil "https://api-fxtrade.oanda.com/v3/instruments/~a/candles~
 ?granularity=~a~
@@ -604,7 +604,7 @@ A batch = 5,000 rates."
   "Requests rates from Oanda in the range comprised by `FROM` and `TO`."
   (let ((from (* from 1000000)))
     (oanda-v3-fix-rates
-     (rest (assoc :|candles|
+     (rest (assoc :candles
                   (cl-json:decode-json-from-string
                    (dex:get (format nil "https://api-fxtrade.oanda.com/v3/instruments/~a/candles~
 ?granularity=~a~
@@ -651,24 +651,24 @@ A batch = 5,000 rates."
 
 (defun oanda-v3-fix-rates (rates)
   (loop for rate in rates
-        collect (let ((bids (assoccess rate :|bid|))
-                      (asks (assoccess rate :|ask|)))
-                  `((:complete . ,(assoccess rate :|complete|))
-                    (:volume . ,(assoccess rate :|volume|))
-                    (:time . ,(format nil "~a" (round (* 1000000 (read-from-string (assoccess rate :|time|))))))
-                    (:open-bid .,(read-from-string (assoccess bids :|o|)))
-                    (:high-bid .,(read-from-string (assoccess bids :|h|)))
-                    (:low-bid .,(read-from-string (assoccess bids :|l|)))
-                    (:close-bid .,(read-from-string (assoccess bids :|c|)))
-                    (:open-ask .,(read-from-string (assoccess asks :|o|)))
-                    (:high-ask .,(read-from-string (assoccess asks :|h|)))
-                    (:low-ask .,(read-from-string (assoccess asks :|l|)))
-                    (:close-ask .,(read-from-string (assoccess asks :|c|)))))))
+        collect (let ((bids (assoccess rate :bid))
+                      (asks (assoccess rate :ask)))
+                  `((:complete . ,(assoccess rate :complete))
+                    (:volume . ,(assoccess rate :volume))
+                    (:time . ,(format nil "~a" (round (* 1000000 (read-from-string (assoccess rate :time))))))
+                    (:open-bid .,(read-from-string (assoccess bids :o)))
+                    (:high-bid .,(read-from-string (assoccess bids :h)))
+                    (:low-bid .,(read-from-string (assoccess bids :l)))
+                    (:close-bid .,(read-from-string (assoccess bids :c)))
+                    (:open-ask .,(read-from-string (assoccess asks :o)))
+                    (:high-ask .,(read-from-string (assoccess asks :h)))
+                    (:low-ask .,(read-from-string (assoccess asks :l)))
+                    (:close-ask .,(read-from-string (assoccess asks :c)))))))
 
 (defun oanda-rates-count (instrument timeframe count)
   "Gathers `COUNT` prices from Oanda."
   (oanda-v3-fix-rates
-   (cl:last (rest (assoc :|candles|
+   (cl:last (rest (assoc :candles
                          (cl-json:decode-json-from-string
                           (dex:get (format nil "https://api-fxtrade.oanda.com/v3/instruments/~a/candles~
 ?granularity=~a~
@@ -743,7 +743,7 @@ be returned using the calculated timestamp."
 (defun oanda-random-rates-count (instrument timeframe count)
   (multiple-value-bind (start end) (random-start-date timeframe count)
     (oanda-v3-fix-rates
-     (subseq (rest (assoc :|candles|
+     (subseq (rest (assoc :candles
                           (cl-json:decode-json-from-string
                            (dex:get (format nil "https://api-fxtrade.oanda.com/v3/instruments/~a/candles~
 ?granularity=~a~
