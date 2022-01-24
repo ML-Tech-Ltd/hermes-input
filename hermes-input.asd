@@ -2,16 +2,10 @@
   :version "0.1.0"
   :author ""
   :license ""
-  :depends-on (:alexandria
-	       :access
-	       :lparallel
-	       :cl-ppcre
-	       :cl-json
-	       :cl-dates
+  :depends-on (:ciel
+               :cl-dates
 	       :flexi-streams
-	       :dexador
 	       :drakma
-	       
 	       :postmodern
 
 	       :hermes-common)

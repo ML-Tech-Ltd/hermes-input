@@ -1,9 +1,10 @@
 (defpackage hermes-input.rates
-  (:use #:cl #:alexandria #:postmodern)
+  (:use #:cl #:ciel #:postmodern)
   (:import-from #:hscom.utils
                 #:format-table
                 #:assoccess
                 #:comment
+                #:dbg
                 #:random-int)
   (:import-from #:hsinp.config
                 #:*tiingo-token*
@@ -53,9 +54,12 @@
            #:get-rates-count-from
            #:get-random-rates-count
            #:get-tp-sl
-           #:*creation-training-datasets*)
+           #:*creation-training-datasets*
+           #:get-unique-dataset)
   (:nicknames #:hsinp.rates))
 (in-package :hermes-input.rates)
+
+(ciel:enable-punch-syntax)
 
 (defparameter *creation-training-datasets* (make-hash-table :test 'equal :synchronized t))
 
@@ -150,6 +154,9 @@
 (defun ->open-ask (rate)
   (assoccess rate :open-ask))
 
+(defun ->time (rate)
+  (assoccess rate :time))
+
 (defun init (howmany-batches &key (timeframes '(:H1 :M1)))
   "INIT populates the `rates` table with batches of rates (a batch is
 5000 rates) for each instrument in `hscom.hsage:*forex*` for each timeframe
@@ -229,7 +236,7 @@ in `timeframes`."
     (subseq rates width)))
 ;; (fracdiff hsper::*rates*)
 
-;; (defparameter *rates* (hsinp.rates::fracdiff (hsinp.rates::get-rates-random-count-big :AUD_USD :M15 10000)))
+;; (defparameter *rates* (hsinp.rates::get-rates-random-count-big :AUD_USD :M15 10000))
 
 (comment
  (loop for rate in (fracdiff *rates*)
@@ -339,10 +346,10 @@ in `timeframes`."
     (insert-rates instrument timeframe recent)
     ;; Getting COUNT - 1 rates, and then appending last rate from RECENT.
     (let ((prev (reverse (conn (query (:limit (:order-by (:select '* :from 'rates :where (:and (:= 'instrument (format nil "~a" instrument))
-                                                                                          (:= 'timeframe (format nil "~a" timeframe))))
-                                               ;; TODO: It's not a good idea to sort by time, considering it's a string. The good news is that we don't have to worry about this until year ~2200.
-                                               (:desc 'rates.time))
-                                       '$1)
+                                                                                               (:= 'timeframe (format nil "~a" timeframe))))
+                                                         ;; TODO: It's not a good idea to sort by time, considering it's a string. The good news is that we don't have to worry about this until year ~2200.
+                                                         (:desc 'rates.time))
+                                              '$1)
                                       (1- count)
                                       :alists)))))
       (if (string= (assoccess (last-elt prev) :time)
@@ -1001,6 +1008,8 @@ be returned using the calculated timestamp."
 (defun hash-keys (hash-table)
   (loop for key being the hash-keys of hash-table collect key))
 
+;; (defparameter *rates* (hsinp.rates:get-rates-count-big :AUD_USD :M15 100000))
+
 (defun get-tp-sl (rates &optional (lookahead-count 10) (symmetricp nil))
   ;; We need to use `rate-open` because we're starting at that price after
   ;; calculating the inputs before this rate.
@@ -1057,4 +1066,194 @@ be returned using the calculated timestamp."
     ;; 	   ;; `(:sl . ,(if (>= max-pos (abs max-neg)) (* max-pos -1.0) (* max-neg -1.0)))
     ;; 	   ))
     ))
-;; (time (get-tp-sl (get-input-dataset *rates* 10)))
+
+(defun euclidean-distance (p q &key key)
+  (if key
+      ;; duplicating for efficiency, instead of using (key #'identity) as default.
+      (sqrt (loop for x in p
+                  and y in q
+                  for d = (- (funcall key x) (funcall key y))
+                  sum (* d d)))
+      (sqrt (loop for x in p
+                  and y in q
+                  for d = (- x y)
+                  sum (* d d)))))
+;; (euclidean-distance '(1 2 3) '(1 2 4))
+;; (euclidean-distance '(5) '(1))
+
+(defun get-tp-sl-prices (rates &optional (lookahead-count 40))
+  (let* ((init-rate-ask (hsinp.rates:->open-ask (first rates)))
+         (init-rate-bid (hsinp.rates:->open-bid (first rates)))
+         (max-pos-ask 0) (max-pos-ask-price 0)
+         (max-pos-bid 0) (max-pos-bid-price 0)
+         (max-neg-ask 0) (max-neg-ask-price 0)
+         (max-neg-bid 0) (max-neg-bid-price 0))
+    (loop for rate in (subseq rates 0 lookahead-count)
+          do (let ((delta-high-ask (- (hsinp.rates:->high-ask rate) init-rate-bid)) ;; Started as sell order, then close as ask.
+                   (delta-high-bid (- (hsinp.rates:->high-bid rate) init-rate-ask)) ;; Started as buy order, then close as bid.
+                   (delta-low-ask (- (hsinp.rates:->low-ask rate) init-rate-bid))
+                   (delta-low-bid (- (hsinp.rates:->low-bid rate) init-rate-ask)))
+               (when (> delta-high-ask max-pos-ask)
+                 (setf max-pos-ask delta-high-ask)
+                 (setf max-pos-ask-price (hsinp.rates:->high-ask rate)))
+               (when (> delta-high-bid max-pos-bid)
+                 (setf max-pos-bid delta-high-bid)
+                 (setf max-pos-bid-price (hsinp.rates:->high-bid rate)))
+               (when (< delta-low-ask max-neg-ask)
+                 (setf max-neg-ask delta-low-ask)
+                 (setf max-neg-ask-price (hsinp.rates:->low-ask rate)))
+               (when (< delta-low-bid max-neg-bid)
+                 (setf max-neg-bid delta-low-bid)
+                 (setf max-neg-bid-price (hsinp.rates:->low-bid rate)))))
+    ;; Can we just use (>= max-pos-ask (abs max-neg-ask)) and totally ignore `-bid` in the condition?
+    `((:tp-price . ,(if (>= max-pos-ask (abs max-neg-ask)) max-pos-bid-price max-neg-ask-price))
+      (:sl-price . ,(if (>= max-pos-ask (abs max-neg-ask)) max-neg-bid-price max-pos-ask-price))
+      (:tp . ,(if (>= max-pos-ask (abs max-neg-ask)) max-pos-bid max-neg-ask))
+      (:sl . ,(if (>= max-pos-ask (abs max-neg-ask)) max-neg-bid max-pos-ask))
+      (:entry-time . ,(read-from-string (->time (first rates))))
+      ;; (:entry-price . ,(if (>= max-pos-ask (abs max-neg-ask)) init-rate-bid init-rate-ask))
+      )
+    ))
+;; (get-tp-sl-prices *rates*)
+
+(defun two-st-devs (results)
+  (bind ((tps (loop for res in results collect (assoccess res :tp-price)))
+         (mean (mean tps))
+         (stdev (alexandria:standard-deviation tps)))
+    (remove-if-not ^(bind ((tp (assoccess _ :tp-price)))
+                      (and (<= tp (+ mean (* 2 stdev)))
+                           (>= tp (- mean (* 2 stdev)))))
+                   results)))
+
+(defun get-keys (alist keys)
+  (loop for key in keys collect (assoc key alist)))
+
+(defun preprocess-uniques (results)
+  (bind ((groups {}))
+    ;; We need to calculate some averages for euclidean distance.
+    (loop for res in results
+          do (bind ((key (get-keys res '(:tp-price :sl-price))))
+               (if (gethash key groups)
+                   (setf (gethash key groups)
+                         {
+                         :avg-entry-time (floor (/ (+ (gethash :avg-entry-time (gethash key groups))
+                                                       (assoccess res :entry-time))
+                                                   2))
+                         :avg-tp (/ (+ (gethash :avg-tp (gethash key groups))
+                                        (assoccess res :tp))
+                                    2)
+                         :avg-sl (/ (+ (gethash :avg-sl (gethash key groups))
+                                        (assoccess res :sl))
+                                    2)
+                         })
+                   (setf (gethash key groups)
+                         {
+                         :avg-entry-time (assoccess res :entry-time)
+                         :avg-tp (assoccess res :tp)
+                         :avg-sl (assoccess res :sl)
+                         }))))
+    ;; Then we just remove duplicates and append the averages.
+    (bind ((results (remove-duplicates results
+                                       :test #'equal
+                                       :key ^(get-keys _ '(:tp-price :sl-price)))))
+      (loop for res in results
+            collect (append res (alexandria:hash-table-alist (gethash (get-keys res '(:tp-price :sl-price)) groups))))
+      ))
+  )
+
+(defun unique (results &key (include-inputs-p nil))
+  (bind ((outputs (two-st-devs (preprocess-uniques results))))
+    (normalize-scores (loop for out1 in outputs
+                            collect `((:result . ,out1)
+                                      (:score . ,(bind ((keys '(:avg-tp :avg-sl :avg-entry-time)))
+                                                   (sqrt (mean (loop for out2 in outputs
+                                                                     collect (^(expt _ 2)
+                                                                               (euclidean-distance
+                                                                                (if include-inputs-p
+                                                                                    (append (get-keys out1 keys)
+                                                                                            (mapcar ^(cons :inp _) (assoccess out1 :inputs)))
+                                                                                    (get-keys out1 keys))
+                                                                                (if include-inputs-p
+                                                                                    (append (get-keys out2 keys)
+                                                                                            (mapcar ^(cons :inp _) (assoccess out2 :inputs)))
+                                                                                    (get-keys out2 keys))
+                                                                                :key #'cdr)))
+                                                               )))))))))
+
+(defun get-unique-dataset (rates n lookahead-count lookbehind-count)
+  "Performs random sampling with normalization without replacement."
+  (bind ((all-results (loop for i from lookbehind-count below (- (length rates) lookahead-count)
+                            collect (append `((:idx . ,i))
+                                            ;; (when include-inputs-p
+                                            ;;   `((:inputs . ,(funcall perception-fn (get-input-dataset rates i)))))
+                                            (get-tp-sl-prices (get-output-dataset rates i) hscom.hsage:*lookahead*))
+                            ))
+         (results (unique all-results))
+         (n (if (>= n (length results)) (1- (length results)) n))
+         (chosen-outputs (bind ((outputs))
+                           (loop repeat n do (bind ((out (spin-the-wheel results)))
+                                               (push (assoccess (assoccess out :result) :idx) outputs)
+                                               (setf results (delete out results :test #'equal))))
+                           outputs)))
+    ;; (loop for out in chosen-outputs
+    ;;       collect (length (loop for res in all-results
+    ;;                     when (equal (get-keys res '(:tp-price :sl-price))
+    ;;                                 (get-keys (assoccess out :result) '(:tp-price :sl-price)))
+    ;;                       collect res)))
+    ;; (print (first chosen-outputs))
+    ;; (mapcar ^(assoccess (assoccess _ :result) :inputs)
+    ;;         (loop for res in results
+    ;;               when (equal (get-keys (assoccess res :result) '(:tp-price :sl-price))
+    ;;                           (get-keys (assoccess (first chosen-outputs) :result) '(:tp-price :sl-price)))
+    ;;                 collect res))
+    chosen-outputs
+    ))
+
+;; (ql-dist:enable (ql-dist:find-dist "ultralisp"))
+;; (ql:quickload :cl-project)
+;; (cl-project:make-project #P"/home/amherag/.roswell/local-projects/hermes-chains/")
+
+;; (comment
+;;   (time (bind ((lbound 0)
+;;                (ubound 9999)
+;;                (rates (subseq *rates* lbound ubound))
+;;                (beliefs (hsper:gen-random-perceptions hscom.hsage:*number-of-agent-inputs*))
+;;                (dataset (get-unique-dataset rates
+;;                                             100
+;;                                             ;; (hsper:gen-perception-fn (assoccess beliefs :perception-fns))
+;;                                             (assoccess beliefs :lookahead-count)
+;;                                             (assoccess beliefs :lookbehind-count)
+;;                                             )))
+;;           ;; (bind ((idxs (sort (loop for d in dataset collect (assoccess (assoccess d :result) :idx)) #'<)))
+;;           ;;   (loop
+;;           ;;     for i from 0 below (- ubound lbound)
+;;           ;;     do (if (find i idxs)
+;;           ;;            (format t "~a,~a,~a~%" i (assoccess (nth i rates) :close-bid) (assoccess (nth i rates) :close-bid))
+;;           ;;            (format t "~a,~a,~a~%" i (assoccess (nth i rates) :close-bid) ""))
+;;           ;;     ))
+;;           dataset
+;;           ))
+;;   (ql:quickload :clog)
+;;   (ql:quickload :clog/tools)
+;;   (clog:run-tutorial 1)
+;;   (clog:run-demo 1)
+;;   (clog-tools:clog-db-admin)
+;;   (clog-tools:clog-builder)
+;;   )
+
+;; 0. only send tp and sl; we're sending entry-price too, and now tp and sl pips
+;; 1. determinar inputs y anadirlos a las tuplas
+;; 2. hacer uniqueness en inputs
+
+(defun spin-the-wheel (pool)
+  (bind ((r (random (loop for p in pool maximize (assoccess p :normalized-score))))
+         (spool (shuffle (alexandria:copy-sequence 'list pool))))
+    (loop for ind in spool
+          if (>= (assoccess ind :normalized-score) r)
+            do (return ind))))
+
+(defun normalize-scores (nums)
+  (bind ((mn (loop for num in nums minimize (assoccess num :score)))
+         (mx (loop for num in nums maximize (assoccess num :score))))
+    (loop for num in nums
+          collect (append num `((:normalized-score . ,(float (/ (- (assoccess num :score) mn) (- mx mn)))))))))
