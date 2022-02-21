@@ -383,17 +383,18 @@ retrieves all the missing rates until current time."
   "TODO: Adapt code for Tiingo instead of Oanda."
   (string-downcase (cl-ppcre:regex-replace-all "_" (format nil "~a" instrument) "")))
 
-(length (bind ((instrument "EUR_USD")
-               (timeframe "M15")
-               (from-str (format nil "~a" (timestamp-to-unix (timestamp- (now) 2 :hour))))
-               (count 1000))
-          (reverse (conn (query (:limit (:order-by (:select '* :from 'rates :where (:and (:= 'instrument instrument)
-                                                                                         (:= 'timeframe timeframe)
-                                                                                         (:>= 'time from-str)))
-                                                   (:desc 'rates.time))
-                                        '$1)
-                                count
-                                :alists)))))
+(comment
+  (length (bind ((instrument "EUR_USD")
+                 (timeframe "M15")
+                 (from-str (format nil "~a" (timestamp-to-unix (timestamp- (now) 2 :hour))))
+                 (count 1000))
+            (reverse (conn (query (:limit (:order-by (:select '* :from 'rates :where (:and (:= 'instrument instrument)
+                                                                                           (:= 'timeframe timeframe)
+                                                                                           (:>= 'time from-str)))
+                                                     (:desc 'rates.time))
+                                          '$1)
+                                  count
+                                  :alists))))))
 
 (defun get-rates-count-from-big (instrument timeframe count from)
   (let* ((instrument (format nil "~a" instrument))
