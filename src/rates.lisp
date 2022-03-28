@@ -46,7 +46,6 @@
            #:format-datasets
            #:score-rates
            #:get-types-score
-           #:get-rates-chunk-of-types
            #:winning-type-output-dataset
            #:get-input-dataset
            #:get-output-dataset
@@ -68,13 +67,13 @@
 
 (defun unix-from-nano (unix-nano &optional (is-string? nil))
   (if is-string?
-      (/ (read-from-string unix-nano) 1000000)
-      (/ unix-nano 1000000)))
+      (/ (read-from-string unix-nano) 1000)
+      (/ unix-nano 1000)))
 
 (defun unix-to-nano (unix &optional (is-string? nil))
   (if is-string?
-      (* (read-from-string unix) 1000000)
-      (* unix 1000000)))
+      (* (read-from-string unix) 1000)
+      (* unix 1000)))
 
 (defclass dataset ()
   ((id :col-type string :initarg :id)
@@ -170,7 +169,7 @@ in `timeframes`."
           do (loop for timeframe in timeframes
                    do (let ((rates (get-rates-batches instrument timeframe howmany-batches)))
                         (insert-rates instrument timeframe rates))))))
-;; (init 1 :timeframes '(:M1))
+;; (init 10 :timeframes '(:M1))
 
 (defun to-pips (instrument quantity)
   (let ((str-instrument (format nil "~a" instrument)))
@@ -249,7 +248,7 @@ in `timeframes`."
 (defun calc-candles-range-count (timeframe from to)
   "CALC-CANDLES-RANGE-COUNT calculates the number of candles that
 would be returned given a date range and a timeframe."
-  (bind ((diff (- to from)))
+  (bind ((diff (/ (- to from) 1000)))
     (1+ (ceiling
          (cond ((eq timeframe :M1) (/ diff (* 60 1)))
                ((eq timeframe :M5) (/ diff (* 60 5)))
@@ -259,11 +258,6 @@ would be returned given a date range and a timeframe."
                ((eq timeframe :H4) (/ diff (* 60 60 4)))
                ((eq timeframe :D) (/ diff (* 60 60 24)))
                ((eq timeframe :W) (/ diff (* 60 60 24 7))))))))
-
-(comment
-  (calc-candles-range-count :M1
-                            (local-time:timestamp-to-unix (local-time:timestamp- (local-time:now) 31 :minute))
-                            (local-time:timestamp-to-unix (local-time:timestamp- (local-time:now) 0 :minute))))
 
 (defun sync-rates (instrument timeframe)
   "SYNC-RATES grabs the latest inserted rate on the database and
@@ -278,19 +272,19 @@ retrieves all the missing rates until current time."
                                              (:desc 'time))
                                             1)
                                     :alist))))
-            (/ (read-from-string (assoccess result :time)) 1000000))))
+            (assoccess result :time))))
     (if latest-recorded-time
         ;; Oanda doesn't allow batches greater than 5000.
         (bind ((needed-batches
                 (^(ceiling (/ _ 5000))
                   (calc-candles-range-count timeframe
                                             latest-recorded-time
-                                            (local-time:timestamp-to-unix (local-time:now))))))
+                                            (hscom.utils:now)))))
           (if (<= needed-batches 1)
               ;; Then we're just missing a few rates.
               (bind ((rates (get-rates-range instrument timeframe
                                              latest-recorded-time
-                                             (timestamp-to-unix (now)))))
+                                             (hscom.utils:now))))
                 ;; ($log $info (format nil "Synchronizing latest ~a rates for ~a ~a." (length rates) instrument timeframe))
                 (insert-rates instrument timeframe rates))
               ;; Then we're missing a bunch. Maybe the server crashed for a while.
@@ -300,48 +294,49 @@ retrieves all the missing rates until current time."
               ))
         ;; Then we're missing all of them. Fresh installation, perhaps.
         (bind ((rates (get-rates-batches instrument timeframe *init-rates-batches*)))
-            ($log $info (format nil "Synchronizing latest ~a rates for ~a ~a." (length rates) instrument timeframe))
-            (insert-rates instrument timeframe rates)))))
-;; (sync-rates :EUR_USD :M15)
+          ($log $info (format nil "Synchronizing latest ~a rates for ~a ~a." (length rates) instrument timeframe))
+          (insert-rates instrument timeframe rates)))))
+;; (sync-rates :AUD_USD :M1)
 
 (defun insert-rates (instrument timeframe rates)
   (let ((instrument (format nil "~a" instrument))
         (timeframe (format nil "~a" timeframe)))
-    (conn
-     (loop for rate in rates
-           ;; Inserting only if complete.
-           do (bind ((time (assoccess rate :time))
-                     (r (get-dao 'rate time instrument timeframe)))
-                (if r
-                    (unless (slot-value r 'complete)
-                      (setf (slot-value r 'complete) (assoccess rate :complete))
-                      (setf (slot-value r 'open-bid) (assoccess rate :open-bid))
-                      (setf (slot-value r 'open-ask) (assoccess rate :open-ask))
-                      (setf (slot-value r 'high-bid) (assoccess rate :high-bid))
-                      (setf (slot-value r 'high-ask) (assoccess rate :high-ask))
-                      (setf (slot-value r 'low-bid) (assoccess rate :low-bid))
-                      (setf (slot-value r 'low-ask) (assoccess rate :low-ask))
-                      (setf (slot-value r 'close-bid) (assoccess rate :close-bid))
-                      (setf (slot-value r 'close-ask) (assoccess rate :close-ask))
-                      (setf (slot-value r 'volume) (assoccess rate :volume))
-                      (update-dao r))
-                    ;; Rate non-existent; creating.
-                    (make-dao 'rate
-                              :time time
-                              :instrument instrument
-                              :timeframe timeframe
-                              :complete (assoccess rate :complete)
-                              :open-bid (assoccess rate :open-bid)
-                              :open-ask (assoccess rate :open-ask)
-                              :high-bid (assoccess rate :high-bid)
-                              :high-ask (assoccess rate :high-ask)
-                              :low-bid (assoccess rate :low-bid)
-                              :low-ask (assoccess rate :low-ask)
-                              :close-bid (assoccess rate :close-bid)
-                              :close-ask (assoccess rate :close-ask)
-                              :volume (assoccess rate :volume)
-                              ))
-                )))))
+    (ignore-errors
+     (conn
+      (loop for rate in rates
+            ;; Inserting only if complete.
+            do (bind ((time (assoccess rate :time))
+                      (r (get-dao 'rate time instrument timeframe)))
+                 (if r
+                     (unless (slot-value r 'complete)
+                       (setf (slot-value r 'complete) (assoccess rate :complete))
+                       (setf (slot-value r 'open-bid) (assoccess rate :open-bid))
+                       (setf (slot-value r 'open-ask) (assoccess rate :open-ask))
+                       (setf (slot-value r 'high-bid) (assoccess rate :high-bid))
+                       (setf (slot-value r 'high-ask) (assoccess rate :high-ask))
+                       (setf (slot-value r 'low-bid) (assoccess rate :low-bid))
+                       (setf (slot-value r 'low-ask) (assoccess rate :low-ask))
+                       (setf (slot-value r 'close-bid) (assoccess rate :close-bid))
+                       (setf (slot-value r 'close-ask) (assoccess rate :close-ask))
+                       (setf (slot-value r 'volume) (assoccess rate :volume))
+                       (update-dao r))
+                     ;; Rate non-existent; creating.
+                     (make-dao 'rate
+                               :time time
+                               :instrument instrument
+                               :timeframe timeframe
+                               :complete (assoccess rate :complete)
+                               :open-bid (assoccess rate :open-bid)
+                               :open-ask (assoccess rate :open-ask)
+                               :high-bid (assoccess rate :high-bid)
+                               :high-ask (assoccess rate :high-ask)
+                               :low-bid (assoccess rate :low-bid)
+                               :low-ask (assoccess rate :low-ask)
+                               :close-bid (assoccess rate :close-bid)
+                               :close-ask (assoccess rate :close-ask)
+                               :volume (assoccess rate :volume)
+                               ))
+                 ))))))
 
 (defun pips (n &optional (jpy? nil) (decimal? nil))
   (if decimal?
@@ -383,19 +378,6 @@ retrieves all the missing rates until current time."
   "TODO: Adapt code for Tiingo instead of Oanda."
   (string-downcase (cl-ppcre:regex-replace-all "_" (format nil "~a" instrument) "")))
 
-(comment
-  (length (bind ((instrument "EUR_USD")
-                 (timeframe "M15")
-                 (from-str (format nil "~a" (timestamp-to-unix (timestamp- (now) 2 :hour))))
-                 (count 1000))
-            (reverse (conn (query (:limit (:order-by (:select '* :from 'rates :where (:and (:= 'instrument instrument)
-                                                                                           (:= 'timeframe timeframe)
-                                                                                           (:>= 'time from-str)))
-                                                     (:desc 'rates.time))
-                                          '$1)
-                                  count
-                                  :alists))))))
-
 (defun get-rates-count-from-big (instrument timeframe count from)
   (let* ((instrument (format nil "~a" instrument))
          (timeframe (format nil "~a" timeframe))
@@ -430,8 +412,8 @@ retrieves all the missing rates until current time."
 ;; (get-rates-count :EUR_USD hscom.hsage:*train-tf* 10)
 
 (defun get-rates-random-count-big (instrument timeframe count)
-  "Assumes a minimum of 50K rates"
-  (let* ((offset (random-int 0 (- 50000 count))))
+  "Assumes a minimum of 10K rates"
+  (let* ((offset (random-int 0 (- 10000 count))))
     (reverse (conn (query (:limit (:order-by (:select '* :from 'rates :where (:and (:= 'instrument (format nil "~a" instrument))
                                                                               (:= 'timeframe (format nil "~a" timeframe))))
                                    ;; TODO: It's not a good idea to sort by time, considering it's a string. The good news is that we don't have to worry about this until year ~2200.
@@ -453,8 +435,8 @@ retrieves all the missing rates until current time."
                                      (:desc 'rates.time))
                           :alists)))))
 ;; (get-rates-range-big :EUR_USD :M15
-;;                       (* (timestamp-to-unix (timestamp- (now) 2 :day)) 1000000)
-;;                       (* (timestamp-to-unix (timestamp- (now) 1 :day)) 1000000))
+;;                       (* (timestamp-to-unix (timestamp- (now) 2 :day)) 1000)
+;;                       (* (timestamp-to-unix (timestamp- (now) 1 :day)) 1000))
 
 (defun update-creation-training-dataset (type pattern instrument timeframe start end)
   (setf (gethash (list instrument timeframe pattern type) *creation-training-datasets*)
@@ -548,20 +530,6 @@ retrieves all the missing rates until current time."
 (defun get-types-score (scored-rates types)
   (loop for type in types sum (assoccess scored-rates type)))
 
-(defun get-rates-chunk-of-types (rates types &key (min-chunk-size 100) (max-chunk-size 500)
-                                                  (chunk-step 20) (slide-step 20) (lookahead 10) (stagnation-threshold 0.5))
-  (let ((score 0)
-        (winner-from 0)
-        (winner-to 0))
-    (loop for chunk-plus from min-chunk-size below (- max-chunk-size min-chunk-size) by chunk-step
-          do (loop for idx from 0 below (- (length rates) chunk-plus) by slide-step
-                   do (let ((s (get-types-score (score-rates (subseq rates idx (+ idx chunk-plus)) :lookahead lookahead :stagnation-threshold stagnation-threshold) types)))
-                        (when (> s score)
-                          (setf score s)
-                          (setf winner-from idx)
-                          (setf winner-to (+ idx chunk-plus))))))
-    (values winner-from winner-to)))
-
 ;; (defparameter *rates* (hsinp.rates:fracdiff (hsinp.rates:get-rates-count-big :AUD_USD :H1 10000)))
 ;; (get-rates-chunk-of-types *rates* '(:bullish) :min-chunk-size 300 :max-chunk-size 601 :slide-step 50)
 
@@ -636,7 +604,7 @@ A batch = 5,000 rates."
   "Requests `COUNT` rates from `PROVIDER` in the starting from `FROM` unix timestamp."
   (oanda-rates-count-from instrument timeframe count from))
 
-;; (get-rates-count-from :EUR_USD :H1 5 (* (local-time:timestamp-to-unix (local-time:timestamp- (local-time:now) 5 :DAY)) 1000000))
+;; (get-rates-count-from :EUR_USD :H1 5 (* (local-time:timestamp-to-unix (local-time:timestamp- (local-time:now) 5 :DAY)) 1000))
 
 (defun tiingo-rates-range (instrument timeframe start-timestamp end-timestamp &key (type :fx))
   (tiingo-request :type type :instrument instrument :timeframe timeframe :start-timestamp start-timestamp :end-timestamp end-timestamp))
@@ -647,10 +615,12 @@ A batch = 5,000 rates."
 
 (defun oanda-rates-range (instrument timeframe from to)
   "Requests rates from Oanda in the range comprised by `FROM` and `TO`."
-  (oanda-v3-fix-rates
-   (rest (assoc :candles
-                (cl-json:decode-json-from-string
-                 (dex:get (format nil "https://api-fxtrade.oanda.com/v3/instruments/~a/candles~
+  (bind ((from (/ from 1000))
+         (to (/ to 1000)))
+    (oanda-v3-fix-rates
+     (rest (assoc :candles
+                  (cl-json:decode-json-from-string
+                   (dex:get (format nil "https://api-fxtrade.oanda.com/v3/instruments/~a/candles~
 ?granularity=~a~
 &price=BA~
 &from=~a~
@@ -658,18 +628,17 @@ A batch = 5,000 rates."
 &dailyAlignment=0~
 &candleFormat=bidask~
 &alignmentTimezone=America%2FNew_York"
-                                  instrument
-                                  timeframe
-                                  from
-                                  to)
-                          :insecure t
-                          :headers `(("Accept-Datetime-Format" . "UNIX")
-                                     ("Authorization" . ,(format nil "Bearer ~a" *oanda-token*)))))))))
+                                    instrument
+                                    timeframe
+                                    from
+                                    to)
+                            :insecure t
+                            :headers `(("Accept-Datetime-Format" . "UNIX")
+                                       ("Authorization" . ,(format nil "Bearer ~a" *oanda-token*))))))))))
 
 (defun oanda-rates-count-from (instrument timeframe count from)
   "Requests rates from Oanda in the range comprised by `FROM` and `TO`."
-  (let (;; (from (* from 1000000))
-        )
+  (bind ((from (/ from 1000)))
     (oanda-v3-fix-rates
      (rest (assoc :candles
                   (cl-json:decode-json-from-string
@@ -689,8 +658,6 @@ A batch = 5,000 rates."
                             :headers `(("Accept-Datetime-Format" . "UNIX")
                                        ("Authorization" . ,(format nil "Bearer ~a" *oanda-token*))))))))))
 
-;; (oanda-rates-count-from :EUR_USD :H1 5 (* (local-time:timestamp-to-unix (local-time:timestamp- (local-time:now) 5 :DAY)) 1000000))
-
 (defun timeframe-for-local-time (timeframe)
   (cond ((eq timeframe :H1) :HOUR)
         ((eq timeframe :D) :DAY)))
@@ -703,21 +670,21 @@ A batch = 5,000 rates."
 
 (defun tiingo-rates-count (instrument timeframe count &key (type :fx))
   (let* ((cal (cl-dates:make-calendar :ny))
-         (start-timestamp (* 1000000 (local-time:timestamp-to-unix
+         (start-timestamp (* 1000 (local-time:timestamp-to-unix
                                       (local-time:parse-timestring
                                        (cl-dates:date->string
                                         (cl-dates:add-workdays
                                          (cl-dates:todays-date)
                                          cal
                                          (- (timeframe-count-to-day-count timeframe count))))))))
-         (end-timestamp (* 1000000 (local-time:timestamp-to-unix (local-time:timestamp+ (local-time:now) 1 :DAY)))))
+         (end-timestamp (* 1000 (local-time:timestamp-to-unix (local-time:timestamp+ (local-time:now) 1 :DAY)))))
     (cl:last (tiingo-request :type type :instrument instrument :timeframe timeframe :start-timestamp start-timestamp :end-timestamp end-timestamp) count)))
 
 ;; (defparameter *oanda* (oanda-rates-count :EUR_USD :H4 20))
 ;; (defparameter *tiingo* (tiingo-rates-count :EUR_USD :D 20))
 
 (defun oanda-v3-fix-time (time)
-  (format nil "~a" (round (* 1000000 (read-from-string time)))))
+  (round (* 1000 (read-from-string time))))
 
 (defun oanda-v3-fix-rates (rates)
   (loop for rate in rates
@@ -802,9 +769,9 @@ be returned using the calculated timestamp."
                                               (timeframe-count-to-day-count timeframe (1+ count))))
          )
     (values
-     (* 1000000 (local-time:timestamp-to-unix
+     (* 1000 (local-time:timestamp-to-unix
                  (local-time:parse-timestring (cl-dates:date->string from-timestamp))))
-     (* 1000000 (local-time:timestamp-to-unix
+     (* 1000 (local-time:timestamp-to-unix
                  (local-time:parse-timestring (cl-dates:date->string to-timestamp)))))
     ))
 
@@ -861,7 +828,7 @@ be returned using the calculated timestamp."
              (:close-bid . ,(access:access rate :close))
              (:high-bid . ,(access:access rate :high))
              (:low-bid . ,(access:access rate :low))
-             (:time . ,(format nil "~a" (* 1000000
+             (:time . ,(format nil "~a" (* 1000
                                            (local-time:timestamp-to-unix
                                             (local-time:parse-timestring (access:access rate :date)))))))))
 
@@ -869,7 +836,7 @@ be returned using the calculated timestamp."
   (string-downcase (format nil "~a" type)))
 
 (defun date-for-tiingo (timestamp)
-  (subseq (local-time:to-rfc3339-timestring (local-time:unix-to-timestamp (floor (/ timestamp 1000000)))) 0 10))
+  (subseq (local-time:to-rfc3339-timestring (local-time:unix-to-timestamp (floor (/ timestamp 1000)))) 0 10))
 
 (defun tiingo-request (&key (type :FX)
                             (instrument :EUR_USD)
@@ -1173,7 +1140,7 @@ be returned using the calculated timestamp."
       (:sl-price . ,(if (>= max-pos-ask (abs max-neg-ask)) max-neg-bid-price max-pos-ask-price))
       (:tp . ,(if (>= max-pos-ask (abs max-neg-ask)) max-pos-bid max-neg-ask))
       (:sl . ,(if (>= max-pos-ask (abs max-neg-ask)) max-neg-bid max-pos-ask))
-      (:entry-time . ,(read-from-string (->time (first rates))))
+      (:entry-time . ,(->time (first rates)))
       ;; (:entry-price . ,(if (>= max-pos-ask (abs max-neg-ask)) init-rate-bid init-rate-ask))
       )
     ))
