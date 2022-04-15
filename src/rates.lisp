@@ -560,7 +560,7 @@ retrieves all the missing rates until current time."
   (subseq rates 0 idx))
 
 (defun get-output-dataset (rates idx)
-  (subseq rates idx))
+  (nthcdr idx rates))
 
 (defun get-rates-batches (instrument granularity howmany-batches)
   "Gathers prices from Oanda.
