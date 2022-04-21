@@ -633,6 +633,31 @@ A batch = 5,000 rates."
                             :headers `(("Accept-Datetime-Format" . "UNIX")
                                        ("Authorization" . ,(format nil "Bearer ~a" *oanda-token*))))))))))
 
+(defun oanda-rates-from (instrument timeframe from)
+  "Requests rates from Oanda in the range comprised by `FROM` and `TO`."
+  (bind ((from (/ from 1000)))
+    (oanda-v3-fix-rates
+     (rest (assoc :candles
+                  (cl-json:decode-json-from-string
+                   (dex:get (format nil "https://api-fxtrade.oanda.com/v3/instruments/~a/candles~
+?granularity=~a~
+&price=BA~
+&from=~a~
+&dailyAlignment=0~
+&candleFormat=bidask~
+&alignmentTimezone=America%2FNew_York"
+                                    instrument
+                                    timeframe
+                                    from)
+                            :insecure t
+                            :headers `(("Accept-Datetime-Format" . "UNIX")
+                                       ("Authorization" . ,(format nil "Bearer ~a" *oanda-token*))))))))))
+
+(defun get-rates-from (instrument timeframe from &key (provider :oanda) (type :fx))
+  "Requests rates from `PROVIDER` starting from FROM timestamp."
+  (declare (ignore provider type))
+  (oanda-rates-from instrument timeframe from))
+
 (defun oanda-rates-count-from (instrument timeframe count from)
   "Requests rates from Oanda in the range comprised by `FROM` and `TO`."
   (bind ((from (/ from 1000)))
