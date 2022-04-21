@@ -303,42 +303,41 @@ retrieves all the missing rates until current time."
 (defun insert-rates (instrument timeframe rates)
   (let ((instrument (format nil "~a" instrument))
         (timeframe (format nil "~a" timeframe)))
-    (ignore-errors
-     (conn
-      (loop for rate in rates
-            ;; Inserting only if complete.
-            do (bind ((time (assoccess rate :time))
-                      (r (get-dao 'rate time instrument timeframe)))
-                 (if r
-                     (unless (slot-value r 'complete)
-                       (setf (slot-value r 'complete) (assoccess rate :complete))
-                       (setf (slot-value r 'open-bid) (assoccess rate :open-bid))
-                       (setf (slot-value r 'open-ask) (assoccess rate :open-ask))
-                       (setf (slot-value r 'high-bid) (assoccess rate :high-bid))
-                       (setf (slot-value r 'high-ask) (assoccess rate :high-ask))
-                       (setf (slot-value r 'low-bid) (assoccess rate :low-bid))
-                       (setf (slot-value r 'low-ask) (assoccess rate :low-ask))
-                       (setf (slot-value r 'close-bid) (assoccess rate :close-bid))
-                       (setf (slot-value r 'close-ask) (assoccess rate :close-ask))
-                       (setf (slot-value r 'volume) (assoccess rate :volume))
-                       (update-dao r))
-                     ;; Rate non-existent; creating.
-                     (make-dao 'rate
-                               :time time
-                               :instrument instrument
-                               :timeframe timeframe
-                               :complete (assoccess rate :complete)
-                               :open-bid (assoccess rate :open-bid)
-                               :open-ask (assoccess rate :open-ask)
-                               :high-bid (assoccess rate :high-bid)
-                               :high-ask (assoccess rate :high-ask)
-                               :low-bid (assoccess rate :low-bid)
-                               :low-ask (assoccess rate :low-ask)
-                               :close-bid (assoccess rate :close-bid)
-                               :close-ask (assoccess rate :close-ask)
-                               :volume (assoccess rate :volume)
-                               ))
-                 ))))))
+    (conn
+     (loop for rate in rates
+           ;; Inserting only if complete.
+           do (bind ((time (assoccess rate :time))
+                     (r (get-dao 'rate time instrument timeframe)))
+                    (if r
+                        (unless (slot-value r 'complete)
+                          (setf (slot-value r 'complete) (assoccess rate :complete))
+                          (setf (slot-value r 'open-bid) (assoccess rate :open-bid))
+                          (setf (slot-value r 'open-ask) (assoccess rate :open-ask))
+                          (setf (slot-value r 'high-bid) (assoccess rate :high-bid))
+                          (setf (slot-value r 'high-ask) (assoccess rate :high-ask))
+                          (setf (slot-value r 'low-bid) (assoccess rate :low-bid))
+                          (setf (slot-value r 'low-ask) (assoccess rate :low-ask))
+                          (setf (slot-value r 'close-bid) (assoccess rate :close-bid))
+                          (setf (slot-value r 'close-ask) (assoccess rate :close-ask))
+                          (setf (slot-value r 'volume) (assoccess rate :volume))
+                          (update-dao r))
+                        ;; Rate non-existent; creating.
+                        (make-dao 'rate
+                                  :time time
+                                  :instrument instrument
+                                  :timeframe timeframe
+                                  :complete (assoccess rate :complete)
+                                  :open-bid (assoccess rate :open-bid)
+                                  :open-ask (assoccess rate :open-ask)
+                                  :high-bid (assoccess rate :high-bid)
+                                  :high-ask (assoccess rate :high-ask)
+                                  :low-bid (assoccess rate :low-bid)
+                                  :low-ask (assoccess rate :low-ask)
+                                  :close-bid (assoccess rate :close-bid)
+                                  :close-ask (assoccess rate :close-ask)
+                                  :volume (assoccess rate :volume)
+                                  ))
+                    )))))
 
 (defun pips (n &optional (jpy? nil) (decimal? nil))
   (if decimal?
