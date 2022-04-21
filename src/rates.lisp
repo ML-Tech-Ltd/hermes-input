@@ -266,38 +266,34 @@ retrieves all the missing rates until current time."
           (alexandria:when-let
               ((result (conn (query (:limit (:order-by
                                              (:select '* :from 'rates
-                                              :where (:and
-                                                      (:= (format nil "~a" instrument) 'instrument)
-                                                      (:= (format nil "~a" timeframe) 'timeframe)))
+                                               :where (:and
+                                                       (:= (format nil "~a" instrument) 'instrument)
+                                                       (:= (format nil "~a" timeframe) 'timeframe)))
                                              (:desc 'time))
                                             1)
                                     :alist))))
             (assoccess result :time))))
-        (ignore-errors
-         ;; Sometimes we get a timeout from Oanda and that error crashes the whole algorithm.
-         ;; We can safely IGNORE-ERRORS until we get response from Oanda.
-         (if latest-recorded-time
-             ;; Oanda doesn't allow batches greater than 5000.
-             (bind ((needed-batches
-                     (^(ceiling (/ _ 5000))
-                       (calc-candles-range-count timeframe
-                                                 latest-recorded-time
-                                                 (hscom.utils:now)))))
-                   (if (<= needed-batches 1)
-                       ;; Then we're just missing a few rates.
-                       (bind ((rates (get-rates-range instrument timeframe
-                                                      latest-recorded-time
-                                                      (hscom.utils:now))))
-                             ;; ($log $info (format nil "Synchronizing latest ~a rates for ~a ~a." (length rates) instrument timeframe))
-                             (insert-rates instrument timeframe rates))
-                       ;; Then we're missing a bunch. Maybe the server crashed for a while.
-                       (bind ((rates (get-rates-batches instrument timeframe needed-batches)))
-                             ;; ($log $info (format nil "Synchronizing latest ~a rates for ~a ~a." (length rates) instrument timeframe))
-                             (insert-rates instrument timeframe rates))))
-             ;; Then we're missing all of them. Fresh installation, perhaps.
-             (bind ((rates (get-rates-batches instrument timeframe *init-rates-batches*)))
-                   ($log $info (format nil "Synchronizing latest ~a rates for ~a ~a." (length rates) instrument timeframe))
-                   (insert-rates instrument timeframe rates))))))
+    (if latest-recorded-time
+        ;; Oanda doesn't allow batches greater than 5000.
+        (bind ((needed-batches
+                (^(ceiling (/ _ 5000))
+                  (calc-candles-range-count timeframe
+                                            latest-recorded-time
+                                            (hscom.utils:now)))))
+          (if (<= needed-batches 1)
+              ;; Then we're just missing a few rates.
+              (bind ((rates (get-rates-from instrument timeframe
+                                            latest-recorded-time)))
+                ;; ($log $info (format nil "Synchronizing latest ~a rates for ~a ~a." (length rates) instrument timeframe))
+                (insert-rates instrument timeframe rates))
+              ;; Then we're missing a bunch. Maybe the server crashed for a while.
+              (bind ((rates (get-rates-batches instrument timeframe needed-batches)))
+                ;; ($log $info (format nil "Synchronizing latest ~a rates for ~a ~a." (length rates) instrument timeframe))
+                (insert-rates instrument timeframe rates))))
+        ;; Then we're missing all of them. Fresh installation, perhaps.
+        (bind ((rates (get-rates-batches instrument timeframe *init-rates-batches*)))
+          ($log $info (format nil "Synchronizing latest ~a rates for ~a ~a." (length rates) instrument timeframe))
+          (insert-rates instrument timeframe rates)))))
 ;; (sync-rates :AUD_USD :M1)
 
 (defun insert-rates (instrument timeframe rates)
@@ -413,8 +409,8 @@ retrieves all the missing rates until current time."
 ;; (get-rates-count :EUR_USD hscom.hsage:*train-tf* 10)
 
 (defun get-rates-random-count-big (instrument timeframe count)
-  "Assumes a minimum of 10K rates"
-  (let* ((offset (random-int 0 (- 10000 count))))
+  "Assumes a minimum of 50K rates"
+  (let* ((offset (random-int 0 (- 50000 count))))
     (reverse (conn (query (:limit (:order-by (:select '* :from 'rates :where (:and (:= 'instrument (format nil "~a" instrument))
                                                                               (:= 'timeframe (format nil "~a" timeframe))))
                                    ;; TODO: It's not a good idea to sort by time, considering it's a string. The good news is that we don't have to worry about this until year ~2200.
