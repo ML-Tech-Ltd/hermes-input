@@ -273,27 +273,28 @@ retrieves all the missing rates until current time."
                                             1)
                                     :alist))))
             (assoccess result :time))))
-    (if latest-recorded-time
-        ;; Oanda doesn't allow batches greater than 5000.
-        (bind ((needed-batches
-                (^(ceiling (/ _ 5000))
-                  (calc-candles-range-count timeframe
-                                            latest-recorded-time
-                                            (hscom.utils:now)))))
-          (if (<= needed-batches 1)
-              ;; Then we're just missing a few rates.
-              (bind ((rates (get-rates-from instrument timeframe
-                                            latest-recorded-time)))
-                ;; ($log $info (format nil "Synchronizing latest ~a rates for ~a ~a." (length rates) instrument timeframe))
-                (insert-rates instrument timeframe rates))
-              ;; Then we're missing a bunch. Maybe the server crashed for a while.
-              (bind ((rates (get-rates-batches instrument timeframe needed-batches)))
-                ;; ($log $info (format nil "Synchronizing latest ~a rates for ~a ~a." (length rates) instrument timeframe))
-                (insert-rates instrument timeframe rates))))
-        ;; Then we're missing all of them. Fresh installation, perhaps.
-        (bind ((rates (get-rates-batches instrument timeframe *init-rates-batches*)))
-          ($log $info (format nil "Synchronizing latest ~a rates for ~a ~a." (length rates) instrument timeframe))
-          (insert-rates instrument timeframe rates)))))
+    (ignore-errors
+     (if latest-recorded-time
+         ;; Oanda doesn't allow batches greater than 5000.
+         (bind ((needed-batches
+                 (^(ceiling (/ _ 5000))
+                   (calc-candles-range-count timeframe
+                                             latest-recorded-time
+                                             (hscom.utils:now)))))
+           (if (<= needed-batches 1)
+               ;; Then we're just missing a few rates.
+               (bind ((rates (get-rates-from instrument timeframe
+                                             latest-recorded-time)))
+                 ;; ($log $info (format nil "Synchronizing latest ~a rates for ~a ~a." (length rates) instrument timeframe))
+                 (insert-rates instrument timeframe rates))
+               ;; Then we're missing a bunch. Maybe the server crashed for a while.
+               (bind ((rates (get-rates-batches instrument timeframe needed-batches)))
+                 ;; ($log $info (format nil "Synchronizing latest ~a rates for ~a ~a." (length rates) instrument timeframe))
+                 (insert-rates instrument timeframe rates))))
+         ;; Then we're missing all of them. Fresh installation, perhaps.
+         (bind ((rates (get-rates-batches instrument timeframe *init-rates-batches*)))
+           ($log $info (format nil "Synchronizing latest ~a rates for ~a ~a." (length rates) instrument timeframe))
+           (insert-rates instrument timeframe rates))))))
 ;; (sync-rates :AUD_USD :M1)
 
 (defun insert-rates (instrument timeframe rates)
