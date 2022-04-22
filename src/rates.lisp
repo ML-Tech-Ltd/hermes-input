@@ -556,7 +556,7 @@ retrieves all the missing rates until current time."
   (subseq rates 0 idx))
 
 (defun get-output-dataset (rates idx)
-  (nthcdr idx rates))
+  (nthcdr (1+ idx) rates))
 
 (defun get-rates-batches (instrument granularity howmany-batches)
   "Gathers prices from Oanda.
@@ -1063,20 +1063,21 @@ be returned using the calculated timestamp."
 
 ;; (defparameter *rates* (hsinp.rates:get-rates-count-big :AUD_USD :M15 100000))
 
-(defun get-tp-sl (rates &optional (lookahead-count 10) (symmetricp nil))
+(defun get-tp-sl (rates idx &optional (lookahead-count 10) (symmetricp nil))
   ;; We need to use `rate-open` because we're starting at that price after
   ;; calculating the inputs before this rate.
-  (let* ((init-rate-ask (hsinp.rates:->open-ask (first rates)))
-         (init-rate-bid (hsinp.rates:->open-bid (first rates)))
+  (let* ((init-rate-ask (hsinp.rates:->open-ask (aref rates idx)))
+         (init-rate-bid (hsinp.rates:->open-bid (aref rates idx)))
          (max-pos-ask 0)
          (max-pos-bid 0)
          (max-neg-ask 0)
          (max-neg-bid 0))
-    (loop for rate in (subseq rates 0 lookahead-count)
-          do (let ((delta-high-ask (- (hsinp.rates:->high-ask rate) init-rate-bid)) ;; Started as sell order, then close as ask.
-                   (delta-high-bid (- (hsinp.rates:->high-bid rate) init-rate-ask)) ;; Started as buy order, then close as bid.
-                   (delta-low-ask (- (hsinp.rates:->low-ask rate) init-rate-bid))
-                   (delta-low-bid (- (hsinp.rates:->low-bid rate) init-rate-ask)))
+    (loop for i from idx below (+ idx lookahead-count)
+          do (bind ((rate (aref rates i))
+                    (delta-high-ask (- (hsinp.rates:->high-ask rate) init-rate-bid)) ;; Started as sell order, then close as ask.
+                    (delta-high-bid (- (hsinp.rates:->high-bid rate) init-rate-ask)) ;; Started as buy order, then close as bid.
+                    (delta-low-ask (- (hsinp.rates:->low-ask rate) init-rate-bid))
+                    (delta-low-bid (- (hsinp.rates:->low-bid rate) init-rate-ask)))
                ;; Checking for possible price stagnation. If true, ignore.
                ;; (unless (and (< init-rate delta-high)
                ;; 		    (> init-rate delta-low))
