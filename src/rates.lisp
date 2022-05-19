@@ -1249,19 +1249,7 @@ be returned using the calculated timestamp."
                                                (push (assoccess (assoccess out :result) :idx) outputs)
                                                (setf results (delete out results :test #'equal))))
                            outputs)))
-    ;; (loop for out in chosen-outputs
-    ;;       collect (length (loop for res in all-results
-    ;;                     when (equal (get-keys res '(:tp-price :sl-price))
-    ;;                                 (get-keys (assoccess out :result) '(:tp-price :sl-price)))
-    ;;                       collect res)))
-    ;; (print (first chosen-outputs))
-    ;; (mapcar ^(assoccess (assoccess _ :result) :inputs)
-    ;;         (loop for res in results
-    ;;               when (equal (get-keys (assoccess res :result) '(:tp-price :sl-price))
-    ;;                           (get-keys (assoccess (first chosen-outputs) :result) '(:tp-price :sl-price)))
-    ;;                 collect res))
-    chosen-outputs
-    ))
+    chosen-outputs))
 
 ;; (ql-dist:enable (ql-dist:find-dist "ultralisp"))
 ;; (ql:quickload :cl-project)
