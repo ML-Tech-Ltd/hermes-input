@@ -4,17 +4,17 @@
   :license ""
   :depends-on (:ciel
                :cl-dates
-	       :flexi-streams
-	       :drakma
-	       :postmodern
+               :flexi-streams
+               :drakma
+               :postmodern
 
-	       :hermes-common)
+               :hermes-common)
   :components ((:module "src"
                 :components
                 ((:file "main" :depends-on ("config"))
-		 (:file "api" :depends-on ("rates"))
-		 (:file "rates")
-		 (:file "config"))))
+                 (:file "api" :depends-on ("rates"))
+                 (:file "rates")
+                 (:file "config"))))
   :description ""
   :long-description
   #.(read-file-string

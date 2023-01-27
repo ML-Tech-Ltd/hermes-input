@@ -6,13 +6,12 @@
                 #:comment
                 #:dbg
                 #:random-int)
-  (:import-from #:hsinp.config
-                #:*tiingo-token*
-                #:*oanda-token*)
-  (:import-from #:hscom.hsinp
-                #:*init-rates-batches*)
   (:import-from #:hscom.db
                 #:conn)
+  (:import-from #:hscom.config
+                #:cfg<
+                #:cfg>
+                #:cfg>>)
   (:export #:->close
            #:->high
            #:->low
@@ -162,14 +161,14 @@
 
 (defun init (howmany-batches &key (timeframes '(:H1 :M1)))
   "INIT populates the `rates` table with batches of rates (a batch is
-5000 rates) for each instrument in `hscom.hsage:*forex*` for each timeframe
+5000 rates) for each instrument in `(cfg>> :hscom forex)` for each timeframe
 in `timeframes`."
-  (let ((instruments hscom.hsage:*forex*))
-    (loop for instrument in instruments
+  (let ((instruments (cfg>> :hscom :forex)))
+    (loop for instrument across instruments
           do (loop for timeframe in timeframes
                    do (let ((rates (get-rates-batches instrument timeframe howmany-batches)))
                         (insert-rates instrument timeframe rates))))))
-;; (init 10 :timeframes '(:M1))
+;; (init 10 :timeframes '(:H1))
 
 (defun to-pips (instrument quantity)
   (let ((str-instrument (format nil "~a" instrument)))
@@ -211,13 +210,15 @@ in `timeframes`."
                (push -w w)
                ))
     w))
-;; (-get-weight-ffd hscom.hsage:*fracdiff-d* hscom.hsage:*fracdiff-threshold* 10)
+;; (-get-weight-ffd 0.3 1e-5 10)
 
 (defun -dot-product (a b)
   (apply #'+ (mapcar #'* (coerce a 'list) (coerce b 'list))))
 
-(defun fracdiff (rates)
-  (let* ((w (-get-weight-ffd hscom.hsage:*fracdiff-d* hscom.hsage:*fracdiff-threshold* (length rates)))
+(defun fracdiff (rates instrument timeframe)
+  (let* ((w (-get-weight-ffd (cfg>> :hsage :fracdiff-d instrument timeframe)
+                             (cfg>> :hsage :fracdiff-threshold instrument timeframe)
+                             (length rates)))
          (width (1- (length w)))
          ;; (output (make-list width :initial-element 0.0))
          )
@@ -241,10 +242,6 @@ in `timeframes`."
 
 ;; (defparameter *rates* (hsinp.rates::get-rates-random-count-big :AUD_USD :M15 10000))
 
-(comment
- (loop for rate in (fracdiff *rates*)
-       do (print (assoccess rate :high-bid))))
-
 (defun calc-candles-range-count (timeframe from to)
   "CALC-CANDLES-RANGE-COUNT calculates the number of candles that
 would be returned given a date range and a timeframe."
@@ -259,10 +256,18 @@ would be returned given a date range and a timeframe."
                ((eq timeframe :D) (/ diff (* 60 60 24)))
                ((eq timeframe :W) (/ diff (* 60 60 24 7))))))))
 
+;; (require :sb-profile)
+;; (sb-profile:profile "HERMES-INPUT.RATES")
+;; (sb-profile:report :print-no-call-list nil)
+;; (sb-profile:reset)
+
 (defun sync-rates (instrument timeframe)
   "SYNC-RATES grabs the latest inserted rate on the database and
 retrieves all the missing rates until current time."
-  (bind ((latest-recorded-time
+
+  (bind ((instrument (alexandria:make-keyword instrument))
+         (timeframe (alexandria:make-keyword timeframe))
+         (latest-recorded-time
           (alexandria:when-let
               ((result (conn (query (:limit (:order-by
                                              (:select '* :from 'rates
@@ -292,10 +297,10 @@ retrieves all the missing rates until current time."
                  ;; ($log $info (format nil "Synchronizing latest ~a rates for ~a ~a." (length rates) instrument timeframe))
                  (insert-rates instrument timeframe rates))))
          ;; Then we're missing all of them. Fresh installation, perhaps.
-         (bind ((rates (get-rates-batches instrument timeframe *init-rates-batches*)))
+         (bind ((rates (get-rates-batches instrument timeframe (cfg>> :hsinp :init-rates-batches))))
            ($log $info (format nil "Synchronizing latest ~a rates for ~a ~a." (length rates) instrument timeframe))
            (insert-rates instrument timeframe rates))))))
-;; (sync-rates :AUD_USD :M1)
+;; (time (sync-rates :AUD_USD :M1))
 
 (defun insert-rates (instrument timeframe rates)
   (let ((instrument (format nil "~a" instrument))
@@ -305,36 +310,35 @@ retrieves all the missing rates until current time."
            ;; Inserting only if complete.
            do (bind ((time (assoccess rate :time))
                      (r (get-dao 'rate time instrument timeframe)))
-                    (if r
-                        (unless (slot-value r 'complete)
-                          (setf (slot-value r 'complete) (assoccess rate :complete))
-                          (setf (slot-value r 'open-bid) (assoccess rate :open-bid))
-                          (setf (slot-value r 'open-ask) (assoccess rate :open-ask))
-                          (setf (slot-value r 'high-bid) (assoccess rate :high-bid))
-                          (setf (slot-value r 'high-ask) (assoccess rate :high-ask))
-                          (setf (slot-value r 'low-bid) (assoccess rate :low-bid))
-                          (setf (slot-value r 'low-ask) (assoccess rate :low-ask))
-                          (setf (slot-value r 'close-bid) (assoccess rate :close-bid))
-                          (setf (slot-value r 'close-ask) (assoccess rate :close-ask))
-                          (setf (slot-value r 'volume) (assoccess rate :volume))
-                          (update-dao r))
-                        ;; Rate non-existent; creating.
-                        (make-dao 'rate
-                                  :time time
-                                  :instrument instrument
-                                  :timeframe timeframe
-                                  :complete (assoccess rate :complete)
-                                  :open-bid (assoccess rate :open-bid)
-                                  :open-ask (assoccess rate :open-ask)
-                                  :high-bid (assoccess rate :high-bid)
-                                  :high-ask (assoccess rate :high-ask)
-                                  :low-bid (assoccess rate :low-bid)
-                                  :low-ask (assoccess rate :low-ask)
-                                  :close-bid (assoccess rate :close-bid)
-                                  :close-ask (assoccess rate :close-ask)
-                                  :volume (assoccess rate :volume)
-                                  ))
-                    )))))
+                (if r
+                    (unless (slot-value r 'complete)
+                      (setf (slot-value r 'complete) (assoccess rate :complete))
+                      (setf (slot-value r 'open-bid) (assoccess rate :open-bid))
+                      (setf (slot-value r 'open-ask) (assoccess rate :open-ask))
+                      (setf (slot-value r 'high-bid) (assoccess rate :high-bid))
+                      (setf (slot-value r 'high-ask) (assoccess rate :high-ask))
+                      (setf (slot-value r 'low-bid) (assoccess rate :low-bid))
+                      (setf (slot-value r 'low-ask) (assoccess rate :low-ask))
+                      (setf (slot-value r 'close-bid) (assoccess rate :close-bid))
+                      (setf (slot-value r 'close-ask) (assoccess rate :close-ask))
+                      (setf (slot-value r 'volume) (assoccess rate :volume))
+                      (update-dao r))
+                    ;; Rate non-existent; creating.
+                    (make-dao 'rate
+                              :time time
+                              :instrument instrument
+                              :timeframe timeframe
+                              :complete (assoccess rate :complete)
+                              :open-bid (assoccess rate :open-bid)
+                              :open-ask (assoccess rate :open-ask)
+                              :high-bid (assoccess rate :high-bid)
+                              :high-ask (assoccess rate :high-ask)
+                              :low-bid (assoccess rate :low-bid)
+                              :low-ask (assoccess rate :low-ask)
+                              :close-bid (assoccess rate :close-bid)
+                              :close-ask (assoccess rate :close-ask)
+                              :volume (assoccess rate :volume)
+                              )))))))
 
 (defun pips (n &optional (jpy? nil) (decimal? nil))
   (if decimal?
@@ -578,7 +582,7 @@ A batch = 5,000 rates."
                                                                       end)
                                                               :insecure t
                                                               :headers `(("Accept-Datetime-Format" . "UNIX")
-                                                                         ("Authorization" . ,(format nil "Bearer ~a" *oanda-token*))))))))))
+                                                                         ("Authorization" . ,(format nil "Bearer ~a" (cfg>> :hsinp :oanda-token)))))))))))
                 (sleep 0.5)
                 (if (and candles (< counter howmany-batches))
                     (recur (assoccess (first candles) :time)
@@ -632,7 +636,7 @@ A batch = 5,000 rates."
                                     to)
                             :insecure t
                             :headers `(("Accept-Datetime-Format" . "UNIX")
-                                       ("Authorization" . ,(format nil "Bearer ~a" *oanda-token*))))))))))
+                                       ("Authorization" . ,(format nil "Bearer ~a" (cfg>> :hsinp :oanda-token)))))))))))
 
 (defun oanda-rates-from (instrument timeframe from)
   "Requests rates from Oanda in the range comprised by `FROM` and `TO`."
@@ -652,7 +656,7 @@ A batch = 5,000 rates."
                                     from)
                             :insecure t
                             :headers `(("Accept-Datetime-Format" . "UNIX")
-                                       ("Authorization" . ,(format nil "Bearer ~a" *oanda-token*))))))))))
+                                       ("Authorization" . ,(format nil "Bearer ~a" (cfg>> :hsinp :oanda-token)))))))))))
 
 (defun get-rates-from (instrument timeframe from &key (provider :oanda) (type :fx))
   "Requests rates from `PROVIDER` starting from FROM timestamp."
@@ -679,7 +683,7 @@ A batch = 5,000 rates."
                                     count)
                             :insecure t
                             :headers `(("Accept-Datetime-Format" . "UNIX")
-                                       ("Authorization" . ,(format nil "Bearer ~a" *oanda-token*))))))))))
+                                       ("Authorization" . ,(format nil "Bearer ~a" (cfg>> :hsinp :oanda-token)))))))))))
 
 (defun timeframe-for-local-time (timeframe)
   (cond ((eq timeframe :H1) :HOUR)
@@ -742,7 +746,7 @@ A batch = 5,000 rates."
                                            count)
                                    :insecure t
                                    :headers `(("Accept-Datetime-Format" . "UNIX")
-                                              ("Authorization" . ,(format nil "Bearer ~a" *oanda-token*))))
+                                              ("Authorization" . ,(format nil "Bearer ~a" (cfg>> :hsinp :oanda-token)))))
                           )))
             count)))
 ;; (oanda-rates-count :EUR_USD :M15 2)
@@ -819,7 +823,7 @@ be returned using the calculated timestamp."
                                             end)
                                     :insecure t
                                     :headers `(("Accept-Datetime-Format" . "UNIX")
-                                               ("Authorization" . ,(format nil "Bearer ~a" *oanda-token*)))))))
+                                               ("Authorization" . ,(format nil "Bearer ~a" (cfg>> :hsinp :oanda-token))))))))
              0 count))))
 
 ;; (length (tiingo-random-rates-count :EUR_USD :D 10))
@@ -892,7 +896,7 @@ be returned using the calculated timestamp."
                                     timeframe)
                             :additional-headers `(("Content-Type" . "application/json")
                                                   ("Accept" . "application/json")
-                                                  ("Authorization" . ,(format nil "Token ~a" *tiingo-token*)))))))))
+                                                  ("Authorization" . ,(format nil "Token ~a" (cfg>> :hsinp :tiingo-token))))))))))
 
 (defun max-short (plot-results)
   (let* ((profits (mapcar #'second plot-results))
@@ -1231,8 +1235,7 @@ be returned using the calculated timestamp."
                                                                                     (append (get-keys out2 keys)
                                                                                             (mapcar ^(cons :inp _) (assoccess out2 :inputs)))
                                                                                     (get-keys out2 keys))
-                                                                                :key #'cdr)))
-                                                               )))))))))
+                                                                                :key #'cdr))))))))))))
 
 (defun get-unique-dataset (rates n lookahead-count lookbehind-count)
   "Performs random sampling with normalization without replacement."
@@ -1240,7 +1243,7 @@ be returned using the calculated timestamp."
                             collect (append `((:idx . ,i))
                                             ;; (when include-inputs-p
                                             ;;   `((:inputs . ,(funcall perception-fn (get-input-dataset rates i)))))
-                                            (get-tp-sl-prices (get-output-dataset rates i) hscom.hsage:*lookahead*))
+                                            (get-tp-sl-prices (get-output-dataset rates i) (cfg>> :hsage :lookahead)))
                             ))
          (results (unique all-results))
          (n (if (>= n (length results)) (1- (length results)) n))
@@ -1288,7 +1291,10 @@ be returned using the calculated timestamp."
 ;; 2. hacer uniqueness en inputs
 
 (defun spin-the-wheel (pool)
-  (bind ((r (random (loop for p in pool maximize (assoccess p :normalized-score))))
+  (bind ((r (random (bind ((n (loop for p in pool maximize (assoccess p :normalized-score))))
+                      (if (= n 0)
+                          1
+                          n))))
          (spool (shuffle (alexandria:copy-sequence 'list pool))))
     (loop for ind in spool
           if (>= (assoccess ind :normalized-score) r)
